@@ -9,9 +9,22 @@ public record ExtractedField(
         Double x,
         Double y,
         Double width,
-        Double height) {
+        Double height,
+        String sourceType,
+        String rawText) {
+
+    public ExtractedField(String name,
+                          String value,
+                          Double confidence,
+                          Integer pageNumber,
+                          Double x,
+                          Double y,
+                          Double width,
+                          Double height) {
+        this(name, value, confidence, pageNumber, x, y, width, height, null, value);
+    }
 
     public ExtractedField(String name, String value) {
-        this(name, value, null, null, null, null, null, null);
+        this(name, value, null, null, null, null, null, null, null, value);
     }
 }

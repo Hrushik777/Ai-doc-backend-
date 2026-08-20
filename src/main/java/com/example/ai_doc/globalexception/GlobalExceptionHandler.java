@@ -61,6 +61,23 @@ public class GlobalExceptionHandler {
                 .body(exception.getMessage());
     }
 
+    @ExceptionHandler(ExternalAiServiceException.class)
+    public ResponseEntity<String> handleExternalAiServiceException(
+            ExternalAiServiceException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_GATEWAY)
+                .body("The AI service could not process the request");
+    }
+
+    @ExceptionHandler({UnsupportedDocumentUnderstandingException.class, NoExcelMappingsException.class})
+    public ResponseEntity<String> handleUnprocessableDocumentException(RuntimeException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(exception.getMessage());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<String> handleMaxUploadSizeExceededException(
             MaxUploadSizeExceededException exception) {
