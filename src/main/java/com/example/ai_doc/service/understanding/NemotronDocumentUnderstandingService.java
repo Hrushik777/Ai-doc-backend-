@@ -191,13 +191,13 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
     private ParsedFieldContent splitLabelAndValue(String rawText, String sourceType) {
         int separatorIndex = rawText.indexOf(':');
         if (separatorIndex > 0) {
-            String candidateName = rawText.substring(0, separatorIndex).strip();
+            String candidateName1 = rawText.substring(0, separatorIndex).strip();
             String candidateValue = rawText.substring(separatorIndex + 1).strip();
-            if (!candidateName.isBlank()
-                    && candidateName.length() <= 120
-                    && !candidateName.contains("\n")
+            if (!candidateName1.isBlank()
+                    && candidateName1.length() <= 120
+                    && !candidateName1.contains("\n")
                     && !candidateValue.isBlank()) {
-                return new ParsedFieldContent(candidateName, candidateValue);
+                return new ParsedFieldContent(candidateName1, candidateValue);
             }
         }
         return new ParsedFieldContent(sourceType, rawText);
