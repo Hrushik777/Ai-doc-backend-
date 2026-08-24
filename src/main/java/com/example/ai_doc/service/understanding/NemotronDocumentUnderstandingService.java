@@ -55,6 +55,19 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
             fields.addAll(parseNemotronResponse(response, page.pageNumber()));
         }
 
+        for(int i =0; i< fields.size();i++){
+            ExtractedField field = fields.get(i);
+
+            System.out.println(
+                    "FIELD " + i
+                            + " | name=" + field.name()
+                            + " | value=" + field.value()
+                            + " | rawText=" + field.rawText()
+                            + " | x=" + field.x()
+                            + " | y=" + field.y()
+            );
+        }
+
         return new ExtractedDocumentData(fields);
     }
 

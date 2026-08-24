@@ -57,6 +57,14 @@ public class DocumentProcessingService {
                         deterministicMappings.unmatchedFields(), templateInfo.headers());
         Map<Integer, String> valuesByColumn = resolveValuesByColumn(
                 deterministicMappings, semanticMappings, extractedDocumentData);
+        System.out.println("===== FINAL VALUES BY COLUMN =====");
+
+        valuesByColumn.forEach((column, value) ->
+                System.out.println(
+                        "COLUMN " + column + " -> " + value
+                ));
+
+        System.out.println("==================================");
 
         if (valuesByColumn.isEmpty()) {
             throw new NoExcelMappingsException("No extracted document fields matched the Excel template headers");
