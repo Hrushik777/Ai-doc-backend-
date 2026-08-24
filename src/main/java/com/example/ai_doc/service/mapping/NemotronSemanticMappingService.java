@@ -25,16 +25,51 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
 
     private static final String SYSTEM_PROMPT = """
         /no_think
-        You are a semantic mapping engine for document fields and Excel columns.
-        Return JSON only, exactly in this shape:
-        {"mappings":[{"fieldIndex":0,"columnIndex":0,"confidence":0.0,"reason":"..."}]}.
-        Choose only supplied Excel column indexes.
-        Never invent headers, column indexes, document values, or rewritten values.
-        Use semantic meaning, abbreviations, synonyms, and common technical terminology.
-        Consider supplied document text and type.
-        Do not force weak matches.
-        Confidence must be a number from 0 to 1.
-        Preserve the extracted value exactly.
+
+        You are a document-to-Excel mapping engine.
+
+        The document data comes from a document parsing model and may contain
+        aggregate elements such as tables, lists, sections, or text blocks.
+
+        Your job is to identify every meaningful logical field contained in the
+        supplied document data and map each logical field to the most appropriate
+        Excel column.
+
+        Rules:
+        - Every meaningful logical value must be treated as a unique field.
+        - Never map one aggregate document element to multiple Excel columns using
+          the same field identifier.
+        - If a table contains multiple key/value pairs, identify each pair
+          independently.
+        - Use the original value exactly as supplied.
+        - Do not invent or rewrite values.
+        - Use field names, raw text, document type, page number, and spatial
+          information (x, y, width, height) when available.
+        - Use spatial relationships such as nearby coordinates, same-row
+          positions, and label/value relationships when useful.
+        - Use semantic meaning, abbreviations, synonyms, and technical terminology
+          to match document fields to Excel headers.
+        - Only use supplied Excel column indexes.
+        - Do not map one logical field to multiple Excel columns.
+        - Do not map multiple logical fields to the same Excel column unless the
+          fields clearly represent the same value.
+        - Confidence must be between 0 and 1.
+        - Return JSON only.
+
+        Return exactly this shape:
+
+        {
+          "mappings": [
+            {
+              "fieldId": "string",
+              "name": "string",
+              "value": "string",
+              "columnIndex": 0,
+              "confidence": 0.0,
+              "reason": "string"
+            }
+          ]
+        }
         """;
 
     private final NvidiaChatCompletionClient nvidiaChatCompletionClient;
@@ -78,10 +113,57 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         ArrayNode documentFields = document.putArray("documentFields");
         for (IndexedExtractedField indexedField : unmatchedFields) {
             ExtractedField field = indexedField.field();
-            documentFields.addObject()
-                    .put("fieldIndex", indexedField.fieldIndex())
-                    .put("type", field.sourceType() == null ? field.name() : field.sourceType())
-                    .put("text", field.rawText() == null ? field.value() : field.rawText());
+            ObjectNode documentField = documentFields.addObject();
+
+            documentField.put(
+                    "fieldId",
+                    "field-" + indexedField.fieldIndex()
+            );
+
+            documentField.put(
+                    "sourceFieldIndex",
+                    indexedField.fieldIndex()
+            );
+
+            documentField.put(
+                    "name",
+                    field.name()
+            );
+
+            documentField.put(
+                    "value",
+                    field.value()
+            );
+
+            documentField.put(
+                    "rawText",
+                    field.rawText() == null ? field.value() : field.rawText()
+            );
+
+            documentField.put(
+                    "type",
+                    field.sourceType() == null ? "" : field.sourceType()
+            );
+
+            if (field.pageNumber() != null) {
+                documentField.put("pageNumber", field.pageNumber());
+            }
+
+            if (field.x() != null) {
+                documentField.put("x", field.x());
+            }
+
+            if (field.y() != null) {
+                documentField.put("y", field.y());
+            }
+
+            if (field.width() != null) {
+                documentField.put("width", field.width());
+            }
+
+            if (field.height() != null) {
+                documentField.put("height", field.height());
+            }
         }
 
         ArrayNode excelHeaders = document.putArray("excelHeaders");
@@ -116,6 +198,9 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
             throw new DocumentProcessingException(
                     "Semantic mapping model returned no JSON content");
         }
+        System.out.println("===== MAPPING MODEL RESPONSE =====");
+        System.out.println(content.asText());
+        System.out.println("=================================");
 
         String raw = content.asText().trim();
 
@@ -151,23 +236,31 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         }
     }
 
-    private void validateMappings(List<SemanticMapping> mappings,
-                                  List<IndexedExtractedField> unmatchedFields,
-                                  List<ExcelColumn> headers) {
-        Set<Integer> validFieldIndexes = unmatchedFields.stream()
-                .map(IndexedExtractedField::fieldIndex)
-                .collect(java.util.stream.Collectors.toSet());
+    private void validateMappings(
+            List<SemanticMapping> mappings,
+            List<IndexedExtractedField> unmatchedFields,
+            List<ExcelColumn> headers) {
+
         Set<Integer> validColumnIndexes = headers.stream()
                 .map(ExcelColumn::columnIndex)
                 .collect(java.util.stream.Collectors.toSet());
 
+        Set<String> seenFieldIds = new java.util.HashSet<>();
+
         for (SemanticMapping mapping : mappings) {
-            if (!validFieldIndexes.contains(mapping.fieldIndex())
+
+            if (mapping.fieldId() == null
+                    || mapping.fieldId().isBlank()
+                    || mapping.value() == null
+                    || mapping.value().isBlank()
                     || !validColumnIndexes.contains(mapping.columnIndex())
                     || !Double.isFinite(mapping.confidence())
                     || mapping.confidence() < 0
-                    || mapping.confidence() > 1) {
-                throw new DocumentProcessingException("Semantic mapping model returned an invalid mapping");
+                    || mapping.confidence() > 1
+                    || !seenFieldIds.add(mapping.fieldId())) {
+
+                throw new DocumentProcessingException(
+                        "Semantic mapping model returned an invalid mapping");
             }
         }
     }

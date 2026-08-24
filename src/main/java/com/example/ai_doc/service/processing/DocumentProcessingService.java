@@ -74,37 +74,46 @@ public class DocumentProcessingService {
         return new ProcessedExcelFile(COMPLETED_FILENAME, completedWorkbook);
     }
 
-    private Map<Integer, String> resolveValuesByColumn(DeterministicMappingResult deterministicMappings,
-                                                        List<SemanticMapping> semanticMappings,
-                                                        ExtractedDocumentData extractedDocumentData) {
-        Map<Integer, ResolvedFieldMapping> resolvedMappings = new LinkedHashMap<>(
-                deterministicMappings.mappingsByColumn());
+    private Map<Integer, String> resolveValuesByColumn(
+            DeterministicMappingResult deterministicMappings,
+            List<SemanticMapping> semanticMappings,
+            ExtractedDocumentData extractedDocumentData) {
+
+        Map<Integer, ResolvedFieldMapping> resolvedMappings =
+                new LinkedHashMap<>(deterministicMappings.mappingsByColumn());
 
         for (SemanticMapping semanticMapping : semanticMappings) {
-            if (semanticMapping.fieldIndex() < 0
-                    || semanticMapping.fieldIndex() >= extractedDocumentData.fields().size()) {
-                throw new DocumentProcessingException("Semantic mapping referenced an unknown document field");
-            }
 
-            String value = extractedDocumentData.fields().get(semanticMapping.fieldIndex()).value();
-            if (value == null) {
+            String value = semanticMapping.value();
+
+            if (value == null || value.isBlank()) {
                 continue;
             }
 
             ResolvedFieldMapping candidate = new ResolvedFieldMapping(
-                    semanticMapping.fieldIndex(),
+                    -1,
                     semanticMapping.columnIndex(),
                     value,
                     semanticMapping.confidence(),
                     MappingSource.SEMANTIC
             );
-            resolvedMappings.merge(candidate.columnIndex(), candidate, this::choosePreferredMapping);
+
+            resolvedMappings.merge(
+                    candidate.columnIndex(),
+                    candidate,
+                    this::choosePreferredMapping
+            );
         }
 
         Map<Integer, String> valuesByColumn = new LinkedHashMap<>();
+
         for (ResolvedFieldMapping mapping : resolvedMappings.values()) {
-            valuesByColumn.put(mapping.columnIndex(), mapping.value());
+            valuesByColumn.put(
+                    mapping.columnIndex(),
+                    mapping.value()
+            );
         }
+
         return valuesByColumn;
     }
 
