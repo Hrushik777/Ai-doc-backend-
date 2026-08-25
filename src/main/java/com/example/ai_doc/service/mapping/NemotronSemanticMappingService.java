@@ -28,45 +28,46 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
 
         You are a document-to-Excel mapping engine.
 
-        The document data comes from a document parsing model and may contain
-        aggregate elements such as tables, lists, sections, or text blocks.
+        The supplied document data comes from a document parsing model.
+        A single supplied document element may contain multiple logical values,
+        for example a table, list, or structured text block.
 
-        Your job is to identify every meaningful logical field contained in the
-        supplied document data and map each logical field to the most appropriate
-        Excel column.
+        Your job is to identify each meaningful logical field independently
+        and map it to the appropriate Excel column.
 
         Rules:
-        - Every meaningful logical value must be treated as a unique field.
-        - Never map one aggregate document element to multiple Excel columns using
-          the same field identifier.
-        - If a table contains multiple key/value pairs, identify each pair
-          independently.
-        - Use the original value exactly as supplied.
-        - Do not invent or rewrite values.
-        - Use field names, raw text, document type, page number, and spatial
-          information (x, y, width, height) when available.
-        - Use spatial relationships such as nearby coordinates, same-row
-          positions, and label/value relationships when useful.
-        - Use semantic meaning, abbreviations, synonyms, and technical terminology
-          to match document fields to Excel headers.
+        - Every logical field must have a unique fieldId.
+        - If multiple logical fields come from the same source element,
+          create different fieldIds such as field-2-1, field-2-2, field-2-3.
+        - Never use the source element's fieldId for every logical value.
+        - Extract the actual value for each logical field.
+        - Preserve the original value exactly.
+        - Do not invent, rewrite, summarize, or normalize values.
+        - Use name, value, rawText, type, pageNumber, x, y, width and height
+          when available.
+        - Use spatial relationships when useful.
+        - Use semantic meaning, abbreviations, synonyms and technical
+          terminology when matching fields to Excel headers.
         - Only use supplied Excel column indexes.
-        - Do not map one logical field to multiple Excel columns.
-        - Do not map multiple logical fields to the same Excel column unless the
-          fields clearly represent the same value.
+        - Do not map titles, explanatory text, or unrelated document content
+          unless there is clear evidence that they belong to an Excel header.
+        - If there is no strong match, omit the mapping.
+        - One logical field must not be mapped to multiple Excel columns.
+        - Different logical fields may map to different Excel columns even when
+          they came from the same source document element.
         - Confidence must be between 0 and 1.
         - Return JSON only.
 
         Return exactly this shape:
-
         {
           "mappings": [
             {
-              "fieldId": "string",
-              "name": "string",
-              "value": "string",
+              "fieldId": "field-2-1",
+              "name": "Tag Number",
+              "value": "P-101",
               "columnIndex": 0,
-              "confidence": 0.0,
-              "reason": "string"
+              "confidence": 0.98,
+              "reason": "..."
             }
           ]
         }
@@ -111,12 +112,14 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                                     List<ExcelColumn> headers) {
         ObjectNode document = objectMapper.createObjectNode();
         ArrayNode documentFields = document.putArray("documentFields");
+
         for (IndexedExtractedField indexedField : unmatchedFields) {
             ExtractedField field = indexedField.field();
+
             ObjectNode documentField = documentFields.addObject();
 
             documentField.put(
-                    "fieldId",
+                    "sourceFieldId",
                     "field-" + indexedField.fieldIndex()
             );
 
@@ -125,15 +128,13 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                     indexedField.fieldIndex()
             );
 
-            documentField.put(
-                    "name",
-                    field.name()
-            );
+            if (field.name() != null) {
+                documentField.put("name", field.name());
+            }
 
-            documentField.put(
-                    "value",
-                    field.value()
-            );
+            if (field.value() != null) {
+                documentField.put("value", field.value());
+            }
 
             documentField.put(
                     "rawText",
@@ -167,6 +168,7 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         }
 
         ArrayNode excelHeaders = document.putArray("excelHeaders");
+
         for (ExcelColumn header : headers) {
             excelHeaders.addObject()
                     .put("columnIndex", header.columnIndex())
@@ -241,6 +243,10 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
             List<IndexedExtractedField> unmatchedFields,
             List<ExcelColumn> headers) {
 
+        Set<Integer> validFieldIndexes = unmatchedFields.stream()
+                .map(IndexedExtractedField::fieldIndex)
+                .collect(java.util.stream.Collectors.toSet());
+
         Set<Integer> validColumnIndexes = headers.stream()
                 .map(ExcelColumn::columnIndex)
                 .collect(java.util.stream.Collectors.toSet());
@@ -251,6 +257,8 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
 
             if (mapping.fieldId() == null
                     || mapping.fieldId().isBlank()
+                    || mapping.name() == null
+                    || mapping.name().isBlank()
                     || mapping.value() == null
                     || mapping.value().isBlank()
                     || !validColumnIndexes.contains(mapping.columnIndex())
