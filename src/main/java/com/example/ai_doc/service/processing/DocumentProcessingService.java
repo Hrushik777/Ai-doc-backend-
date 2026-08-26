@@ -46,17 +46,62 @@ public class DocumentProcessingService {
     }
 
     public ProcessedExcelFile process(MultipartFile document, MultipartFile template) {
+
         documentFileValidator.validate(document);
+
+        long start;
+
+        start = System.nanoTime();
         ExcelTemplateInfo templateInfo = excelService.readHeaders(template);
-        ExtractedDocumentData extractedDocumentData = documentUnderstandingService.extractFields(document);
-        DeterministicMappingResult deterministicMappings = headerFieldMapper
-                .findExactMatches(templateInfo, extractedDocumentData);
-        List<SemanticMapping> semanticMappings = deterministicMappings.unmatchedFields().isEmpty()
-                ? List.of()
-                : semanticMappingService.mapUnmatchedFields(
-                        deterministicMappings.unmatchedFields(), templateInfo.headers());
-        Map<Integer, String> valuesByColumn = resolveValuesByColumn(
-                deterministicMappings, semanticMappings, extractedDocumentData);
+        long excelReadTime = elapsedMillis(start);
+
+        start = System.nanoTime();
+        ExtractedDocumentData extractedDocumentData =
+                documentUnderstandingService.extractFields(document);
+        long extractionTime = elapsedMillis(start);
+
+        start = System.nanoTime();
+        DeterministicMappingResult deterministicMappings =
+                headerFieldMapper.findExactMatches(
+                        templateInfo,
+                        extractedDocumentData
+                );
+
+        System.out.println("===== MAPPING STATS =====");
+        System.out.println(
+                "Extracted fields: "
+                        + extractedDocumentData.fields().size()
+        );
+        System.out.println(
+                "Deterministic matches: "
+                        + deterministicMappings.mappingsByColumn().size()
+        );
+        System.out.println(
+                "Unmatched fields: "
+                        + deterministicMappings.unmatchedFields().size()
+        );
+        System.out.println("=========================");
+        long deterministicTime = elapsedMillis(start);
+
+        start = System.nanoTime();
+        List<SemanticMapping> semanticMappings =
+                deterministicMappings.unmatchedFields().isEmpty()
+                        ? List.of()
+                        : semanticMappingService.mapUnmatchedFields(
+                        deterministicMappings.unmatchedFields(),
+                        templateInfo.headers()
+                );
+        long semanticTime = elapsedMillis(start);
+
+        start = System.nanoTime();
+        Map<Integer, String> valuesByColumn =
+                resolveValuesByColumn(
+                        deterministicMappings,
+                        semanticMappings,
+                        extractedDocumentData
+                );
+        long resolveTime = elapsedMillis(start);
+
         System.out.println("===== FINAL VALUES BY COLUMN =====");
 
         valuesByColumn.forEach((column, value) ->
@@ -67,11 +112,37 @@ public class DocumentProcessingService {
         System.out.println("==================================");
 
         if (valuesByColumn.isEmpty()) {
-            throw new NoExcelMappingsException("No extracted document fields matched the Excel template headers");
+            throw new NoExcelMappingsException(
+                    "No extracted document fields matched the Excel template headers"
+            );
         }
-        byte[] completedWorkbook = excelService.populateTemplate(template, templateInfo, valuesByColumn);
 
-        return new ProcessedExcelFile(COMPLETED_FILENAME, completedWorkbook);
+        start = System.nanoTime();
+        byte[] completedWorkbook =
+                excelService.populateTemplate(
+                        template,
+                        templateInfo,
+                        valuesByColumn
+                );
+        long excelWriteTime = elapsedMillis(start);
+
+        System.out.println("===== PIPELINE TIMING =====");
+        System.out.println("Excel read:       " + excelReadTime + " ms");
+        System.out.println("Document parse:   " + extractionTime + " ms");
+        System.out.println("Deterministic:    " + deterministicTime + " ms");
+        System.out.println("Semantic mapping: " + semanticTime + " ms");
+        System.out.println("Resolve values:   " + resolveTime + " ms");
+        System.out.println("Excel write:      " + excelWriteTime + " ms");
+        System.out.println("===========================");
+
+        return new ProcessedExcelFile(
+                COMPLETED_FILENAME,
+                completedWorkbook
+        );
+    }
+
+    private long elapsedMillis(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     private Map<Integer, String> resolveValuesByColumn(

@@ -104,7 +104,7 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
         ObjectNode request = objectMapper.createObjectNode();
         request.put("model", parseModel);
         request.set("messages", objectMapper.createArrayNode().add(message));
-        request.put("max_tokens", 8192);
+        request.put("max_tokens",  2048);
         return request;
     }
 
@@ -152,7 +152,13 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
         }
 
         if (isDocumentElement(node)) {
-            fields.add(toExtractedField(node, pageNumber));
+            ExtractedField field = toExtractedField(node, pageNumber);
+
+            if ("table".equalsIgnoreCase(field.sourceType())) {
+                fields.addAll(splitTableField(field));
+            } else {
+                fields.add(field);
+            }
             return;
         }
 
@@ -217,5 +223,88 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
     }
 
     private record ParsedFieldContent(String name, String value) {
+    }
+    private List<ExtractedField> splitTableField(ExtractedField tableField) {
+
+        List<ExtractedField> fields = new ArrayList<>();
+
+        String tableText = tableField.value();
+
+        if (tableText == null || tableText.isBlank()) {
+            return List.of(tableField);
+        }
+
+        /*
+         * Nemotron currently returns table content in LaTeX-like form:
+         *
+         * Tag Number: & P-101 \\
+         * Equipment Type: & Centrifugal Pump \\
+         * Mfr: & Siemens \\
+         * MAWP: & 150 psi \\
+         * Design Pressure: & 120 psi \\
+         */
+        String[] rows = tableText.split("\\\\\\\\|\\r?\\n");
+
+        int rowIndex = 0;
+
+        for (String row : rows) {
+
+            String cleanedRow = row
+                    .replace("\\multicolumn{2}{c}{", "")
+                    .replace("\\end{tabular}", "")
+                    .replace("\\begin{tabular}{cc}", "")
+                    .strip();
+
+            if (cleanedRow.isBlank()) {
+                continue;
+            }
+
+            String[] parts = cleanedRow.split("&", 2);
+
+            if (parts.length != 2) {
+                continue;
+            }
+
+            String label = cleanTableText(parts[0])
+                    .replaceFirst(":\\s*$", "")
+                    .strip();
+
+            String value = cleanTableText(parts[1])
+                    .strip();
+
+            if (label.isBlank() || value.isBlank()) {
+                continue;
+            }
+
+            fields.add(new ExtractedField(
+                    label,
+                    value,
+                    tableField.confidence(),
+                    tableField.pageNumber(),
+                    tableField.x(),
+                    tableField.y(),
+                    tableField.width(),
+                    tableField.height(),
+                    "table-cell",
+                    cleanedRow
+            ));
+
+            rowIndex++;
+        }
+
+        return fields.isEmpty()
+                ? List.of(tableField)
+                : fields;
+    }
+    private String cleanTableText(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        return text
+                .replace("\\textbf{", "")
+                .replace("}", "")
+                .replace("**", "")
+                .strip();
     }
 }
