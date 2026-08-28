@@ -5,6 +5,8 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
@@ -18,7 +20,26 @@ import java.util.function.Consumer;
 @Component
 public class PdfDocumentRenderer {
 
-    private static final float RENDER_DPI = 150;
+    /**
+     * Rendering resolution. Higher than the 150 this used to be fixed at: handwriting and
+     * faint scans lose strokes at 150, and the parse model cannot report a box for a word
+     * it could not read.
+     */
+    static final float DEFAULT_RENDER_DPI = 200;
+
+    private final float renderDpi;
+
+    public PdfDocumentRenderer() {
+        this(DEFAULT_RENDER_DPI);
+    }
+
+    @Autowired
+    public PdfDocumentRenderer(@Value("${app.render.dpi:200}") float renderDpi) {
+        if (renderDpi <= 0) {
+            throw new IllegalArgumentException("app.render.dpi must be greater than 0");
+        }
+        this.renderDpi = renderDpi;
+    }
 
     public List<DocumentPageImage> renderPages(byte[] pdfContent) {
         List<DocumentPageImage> pages = new ArrayList<>();
@@ -47,7 +68,7 @@ public class PdfDocumentRenderer {
     }
 
     private DocumentPageImage renderPage(PDFRenderer renderer, int pageIndex) throws IOException {
-        BufferedImage image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI, ImageType.RGB);
+        BufferedImage image = renderer.renderImageWithDPI(pageIndex, renderDpi, ImageType.RGB);
 
         // Size the buffer from the rendered bitmap instead of letting it start at 32 bytes and
         // double its way up, which reallocated and copied the whole page image on every growth.
@@ -55,7 +76,8 @@ public class PdfDocumentRenderer {
         if (!ImageIO.write(image, "png", outputStream)) {
             throw new DocumentProcessingException("PNG image writing is not available for PDF rendering");
         }
-        return new DocumentPageImage(pageIndex + 1, "image/png", outputStream.toByteArray());
+        return new DocumentPageImage(pageIndex + 1, "image/png", outputStream.toByteArray(),
+                image.getWidth(), image.getHeight());
     }
 
     private int estimatedPngSize(BufferedImage image) {

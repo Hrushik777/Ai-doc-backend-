@@ -7,6 +7,7 @@ import com.example.ai_doc.model.excel.ExcelColumn;
 import com.example.ai_doc.model.mapping.IndexedExtractedField;
 import com.example.ai_doc.model.mapping.SemanticMapping;
 import com.example.ai_doc.model.mapping.SemanticMappingResponse;
+import com.example.ai_doc.service.nvidia.ModelJsonResponses;
 import com.example.ai_doc.service.nvidia.NvidiaChatCompletionClient;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -191,9 +192,6 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
     """;
 
     private static final int MAX_MAPPING_ATTEMPTS = 2;
-
-    private static final String THINK_OPEN_TAG = "<think>";
-    private static final String THINK_CLOSE_TAG = "</think>";
 
     private static final String TRUNCATED_RESPONSE_MESSAGE =
             "Semantic mapping model ran out of output tokens before completing its JSON object"
@@ -412,7 +410,7 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         String raw = content.asText().trim();
         LOGGER.debug("Semantic mapping model response: {}", raw);
 
-        String json = extractJsonObject(raw);
+        String json = ModelJsonResponses.extractJsonObject(raw);
 
         if (json == null) {
             throw new DocumentProcessingException(truncated
@@ -428,82 +426,6 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                     : "Semantic mapping model returned invalid JSON",
                     exception);
         }
-    }
-
-    /**
-     * Pulls the first complete, brace-balanced JSON object out of a response that may also
-     * carry reasoning traces, prose commentary, or Markdown fences around it. Scanning for a
-     * balanced object is what makes this safe: taking everything between the first '{' and the
-     * last '}' swallowed any stray brace in the surrounding prose and produced invalid JSON.
-     * Returns null when the response contains no complete object.
-     */
-    private String extractJsonObject(String raw) {
-        String text = stripReasoningBlocks(raw);
-
-        int start = text.indexOf('{');
-        if (start < 0) {
-            return null;
-        }
-
-        int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-
-        for (int i = start; i < text.length(); i++) {
-            char character = text.charAt(i);
-
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (character == '\\') {
-                    escaped = true;
-                } else if (character == '"') {
-                    inString = false;
-                }
-                continue;
-            }
-
-            if (character == '"') {
-                inString = true;
-            } else if (character == '{') {
-                depth++;
-            } else if (character == '}') {
-                depth--;
-                if (depth == 0) {
-                    return text.substring(start, i + 1);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private String stripReasoningBlocks(String raw) {
-        // Reasoning models wrap their scratch work in <think>...</think>. An unterminated block
-        // means the token budget ran out mid-thought, so nothing usable follows it.
-        if (raw.indexOf(THINK_OPEN_TAG) < 0) {
-            return raw;
-        }
-
-        StringBuilder cleaned = new StringBuilder(raw.length());
-        int index = 0;
-
-        while (index < raw.length()) {
-            int openTag = raw.indexOf(THINK_OPEN_TAG, index);
-            if (openTag < 0) {
-                cleaned.append(raw, index, raw.length());
-                break;
-            }
-
-            cleaned.append(raw, index, openTag);
-            int closeTag = raw.indexOf(THINK_CLOSE_TAG, openTag);
-            if (closeTag < 0) {
-                break;
-            }
-            index = closeTag + THINK_CLOSE_TAG.length();
-        }
-
-        return cleaned.toString();
     }
 
     private List<SemanticMapping> validateMappings(
@@ -530,11 +452,19 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                     || mapping.value().isBlank()
                     || !Double.isFinite(mapping.confidence())
                     || mapping.confidence() < 0
-                    || mapping.confidence() > 1
-                    || !seenFieldIds.add(mapping.fieldId())) {
+                    || mapping.confidence() > 1) {
 
                 throw new DocumentProcessingException(
                         "Semantic mapping model returned an invalid mapping");
+            }
+
+            // A repeated fieldId used to fail the whole document. It is no longer a contract
+            // violation: one source element can legitimately supply values for several rows,
+            // and the structural stage now produces exactly that. Only the first mapping for
+            // a field can win the column anyway, so a repeat is dropped rather than fatal.
+            if (!seenFieldIds.add(mapping.fieldId())) {
+                LOGGER.debug("Discarding a repeated mapping for source field {}", mapping.fieldId());
+                continue;
             }
 
             // Only unresolved columns are offered to the model. A mapping onto a column we

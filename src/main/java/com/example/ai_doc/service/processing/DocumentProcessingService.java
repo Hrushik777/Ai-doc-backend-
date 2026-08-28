@@ -7,7 +7,11 @@ import com.example.ai_doc.model.explain.ExplainedField;
 import com.example.ai_doc.model.explain.ExplainedMapping;
 import com.example.ai_doc.model.explain.ProcessExplanation;
 import com.example.ai_doc.model.excel.ExcelTemplateInfo;
+import com.example.ai_doc.model.layout.DocumentLayout;
+import com.example.ai_doc.model.layout.ParsedDocument;
 import com.example.ai_doc.model.mapping.DeterministicMappingResult;
+import com.example.ai_doc.model.mapping.CellOrigin;
+import com.example.ai_doc.model.mapping.MappedRecord;
 import com.example.ai_doc.model.mapping.MappingSource;
 import com.example.ai_doc.model.mapping.ResolvedFieldMapping;
 import com.example.ai_doc.model.mapping.SemanticMapping;
@@ -19,10 +23,21 @@ import com.example.ai_doc.globalexception.EmptyFileException;
 import com.example.ai_doc.globalexception.ExternalAiServiceException;
 import com.example.ai_doc.globalexception.NoExcelMappingsException;
 import com.example.ai_doc.service.excel.ExcelService;
+import com.example.ai_doc.service.layout.ColumnClusterer;
+import com.example.ai_doc.service.layout.ColumnGutterDetector;
+import com.example.ai_doc.service.layout.LayoutAnalyzer;
+import com.example.ai_doc.service.layout.RegionClassifier;
+import com.example.ai_doc.service.layout.RegionContinuationDetector;
+import com.example.ai_doc.service.layout.RowBander;
+import com.example.ai_doc.service.layout.VerticalSlabSplitter;
 import com.example.ai_doc.service.mapping.HeaderFieldMapper;
+import com.example.ai_doc.service.mapping.HeaderInferenceService;
+import com.example.ai_doc.service.mapping.LayoutHeaderInferrer;
+import com.example.ai_doc.service.mapping.LayoutRecordMapper;
 import com.example.ai_doc.service.mapping.SemanticMappingService;
 import com.example.ai_doc.service.understanding.DocumentPageImage;
 import com.example.ai_doc.service.understanding.DocumentUnderstandingService;
+import com.example.ai_doc.service.understanding.ParsedDocumentFlattener;
 import com.example.ai_doc.service.understanding.PdfDocumentRenderer;
 import com.example.ai_doc.service.validation.DocumentFileValidator;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -39,6 +54,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -56,6 +72,10 @@ public class DocumentProcessingService {
     private final HeaderFieldMapper headerFieldMapper;
     private final SemanticMappingService semanticMappingService;
     private final PdfDocumentRenderer pdfDocumentRenderer;
+    private final LayoutAnalyzer layoutAnalyzer;
+    private final LayoutRecordMapper layoutRecordMapper;
+    private final ParsedDocumentFlattener parsedDocumentFlattener;
+    private final HeaderInferenceService headerInferenceService;
 
     @Autowired
     public DocumentProcessingService(DocumentFileValidator documentFileValidator,
@@ -63,13 +83,21 @@ public class DocumentProcessingService {
                                      DocumentUnderstandingService documentUnderstandingService,
                                      HeaderFieldMapper headerFieldMapper,
                                      SemanticMappingService semanticMappingService,
-                                     PdfDocumentRenderer pdfDocumentRenderer) {
+                                     PdfDocumentRenderer pdfDocumentRenderer,
+                                     LayoutAnalyzer layoutAnalyzer,
+                                     LayoutRecordMapper layoutRecordMapper,
+                                     ParsedDocumentFlattener parsedDocumentFlattener,
+                                     HeaderInferenceService headerInferenceService) {
         this.documentFileValidator = documentFileValidator;
         this.excelService = excelService;
         this.documentUnderstandingService = documentUnderstandingService;
         this.headerFieldMapper = headerFieldMapper;
         this.semanticMappingService = semanticMappingService;
         this.pdfDocumentRenderer = pdfDocumentRenderer;
+        this.layoutAnalyzer = layoutAnalyzer;
+        this.layoutRecordMapper = layoutRecordMapper;
+        this.parsedDocumentFlattener = parsedDocumentFlattener;
+        this.headerInferenceService = headerInferenceService;
     }
 
     /**
@@ -82,27 +110,44 @@ public class DocumentProcessingService {
                                      HeaderFieldMapper headerFieldMapper,
                                      SemanticMappingService semanticMappingService) {
         this(documentFileValidator, excelService, documentUnderstandingService,
-                headerFieldMapper, semanticMappingService, new PdfDocumentRenderer());
+                headerFieldMapper, semanticMappingService, new PdfDocumentRenderer(),
+                defaultLayoutAnalyzer(), new LayoutRecordMapper(headerFieldMapper),
+                new ParsedDocumentFlattener(), new LayoutHeaderInferrer()::infer);
+    }
+
+    /** The layout stage has no configuration, so the legacy constructor can build its own. */
+    private static LayoutAnalyzer defaultLayoutAnalyzer() {
+        RowBander rowBander = new RowBander();
+        return new LayoutAnalyzer(
+                rowBander,
+                new VerticalSlabSplitter(rowBander),
+                new ColumnGutterDetector(),
+                new ColumnClusterer(),
+                new RegionClassifier(),
+                new RegionContinuationDetector());
     }
 
     public ProcessedExcelFile process(MultipartFile document, MultipartFile template) {
 
         documentFileValidator.validate(document);
 
-        try (Workbook workbook = excelService.openWorkbook(template)) {
-            long start = System.nanoTime();
-            ExcelTemplateInfo templateInfo = excelService.readHeaders(workbook);
-            long excelReadTime = elapsedMillis(start);
+        long start = System.nanoTime();
+        PreparedWorkbook prepared = prepareWorkbook(document, template);
+        long excelReadTime = elapsedMillis(start);
+
+        try (Workbook workbook = prepared.workbook()) {
+            ExcelTemplateInfo templateInfo = prepared.templateInfo();
 
             start = System.nanoTime();
-            DocumentMapping mapping = computeValuesForDocument(document, templateInfo);
+            DocumentMapping mapping = mapDocument(document, prepared);
             long pipelineTime = elapsedMillis(start);
 
-            Map<Integer, String> valuesByColumn = mapping.valuesByColumn();
-
             if (LOGGER.isDebugEnabled()) {
-                valuesByColumn.forEach((column, value) ->
-                        LOGGER.debug("Resolved column {} -> {}", column, value));
+                for (int recordIndex = 0; recordIndex < mapping.records().size(); recordIndex++) {
+                    int row = recordIndex;
+                    mapping.records().get(recordIndex).values().forEach((column, value) ->
+                            LOGGER.debug("Record {} resolved column {} -> {}", row, column, value));
+                }
             }
 
             if (mapping.isEmpty()) {
@@ -110,7 +155,7 @@ public class DocumentProcessingService {
             }
 
             start = System.nanoTime();
-            excelService.writeRow(workbook, templateInfo, templateInfo.dataRowIndex(), valuesByColumn);
+            excelService.writeRows(workbook, templateInfo, templateInfo.dataRowIndex(), mapping.valueRows());
             byte[] completedWorkbook = excelService.serialize(workbook);
             long excelWriteTime = elapsedMillis(start);
 
@@ -135,16 +180,18 @@ public class DocumentProcessingService {
 
         documentFileValidator.validate(document);
 
-        try (Workbook workbook = excelService.openWorkbook(template)) {
-            ExcelTemplateInfo templateInfo = excelService.readHeaders(workbook);
-            DocumentMapping mapping = computeValuesForDocument(document, templateInfo);
+        PreparedWorkbook prepared = prepareWorkbook(document, template);
+
+        try (Workbook workbook = prepared.workbook()) {
+            ExcelTemplateInfo templateInfo = prepared.templateInfo();
+            DocumentMapping mapping = mapDocument(document, prepared);
 
             if (mapping.isEmpty()) {
                 throw new NoExcelMappingsException(mapping.describeEmptyOutcome());
             }
 
-            excelService.writeRow(workbook, templateInfo,
-                    templateInfo.dataRowIndex(), mapping.valuesByColumn());
+            excelService.writeRows(workbook, templateInfo,
+                    templateInfo.dataRowIndex(), mapping.valueRows());
             byte[] completedWorkbook = excelService.serialize(workbook);
 
             return new ProcessExplanation(
@@ -177,6 +224,15 @@ public class DocumentProcessingService {
         return explained;
     }
 
+    /**
+     * Explains every cell of every output row: which stage put the value there, and where it
+     * came from.
+     *
+     * <p>Two provenance shapes are folded together here. A structurally mapped value was read
+     * from a position in the layout and carries that rectangle directly - it has no entry in
+     * the flat extracted-field list to point at. A deterministic or semantic value points
+     * back at the field it came from, and its geometry is looked up there.
+     */
     private List<ExplainedMapping> toExplainedMappings(DocumentMapping mapping) {
         // A semantic mapping is rebuilt without its document index, so the reason and the
         // originating fieldId have to come from the semantic stage's own output. Match on
@@ -189,36 +245,107 @@ public class DocumentProcessingService {
                     .add(semanticMapping);
         }
 
-        List<ExplainedMapping> explained = new ArrayList<>(mapping.resolvedByColumn().size());
+        List<ExplainedMapping> explained = new ArrayList<>();
 
-        for (ResolvedFieldMapping resolved : mapping.resolvedByColumn().values()) {
-            SemanticMapping origin = null;
+        for (int rowIndex = 0; rowIndex < mapping.records().size(); rowIndex++) {
+            MappedRecord record = mapping.records().get(rowIndex);
 
-            if (resolved.source() == MappingSource.SEMANTIC) {
-                List<SemanticMapping> candidates =
-                        semanticByColumn.getOrDefault(resolved.columnIndex(), List.of());
-                for (SemanticMapping candidate : candidates) {
-                    if (Objects.equals(candidate.value(), resolved.value())) {
-                        origin = candidate;
-                        break;
-                    }
+            for (Map.Entry<Integer, String> cell : record.values().entrySet()) {
+                CellOrigin origin = record.origins().get(cell.getKey());
+
+                if (origin != null) {
+                    explained.add(structuralMapping(rowIndex, cell.getKey(), cell.getValue(), origin));
+                    continue;
                 }
-                if (origin == null && !candidates.isEmpty()) {
-                    origin = candidates.get(0);
+
+                ResolvedFieldMapping resolved = mapping.resolvedByColumn().get(cell.getKey());
+                if (resolved != null) {
+                    explained.add(flatMapping(rowIndex, resolved, semanticByColumn, mapping.extractedFields()));
                 }
             }
-
-            explained.add(new ExplainedMapping(
-                    resolved.fieldIndex(),
-                    origin != null ? origin.fieldId() : null,
-                    resolved.columnIndex(),
-                    resolved.value(),
-                    resolved.confidence(),
-                    resolved.source().name(),
-                    origin != null ? origin.reason() : null));
         }
 
         return explained;
+    }
+
+    private ExplainedMapping structuralMapping(int rowIndex, int columnIndex, String value, CellOrigin origin) {
+        return new ExplainedMapping(
+                rowIndex,
+                -1,
+                null,
+                columnIndex,
+                value,
+                1.0,
+                MappingSource.STRUCTURAL.name(),
+                origin.reason(),
+                origin.page(),
+                origin.bbox().xmin(),
+                origin.bbox().ymin(),
+                origin.bbox().width(),
+                origin.bbox().height());
+    }
+
+    private ExplainedMapping flatMapping(int rowIndex,
+                                         ResolvedFieldMapping resolved,
+                                         Map<Integer, List<SemanticMapping>> semanticByColumn,
+                                         List<ExtractedField> extractedFields) {
+        SemanticMapping origin = null;
+
+        if (resolved.source() == MappingSource.SEMANTIC) {
+            List<SemanticMapping> candidates =
+                    semanticByColumn.getOrDefault(resolved.columnIndex(), List.of());
+            for (SemanticMapping candidate : candidates) {
+                if (Objects.equals(candidate.value(), resolved.value())) {
+                    origin = candidate;
+                    break;
+                }
+            }
+            if (origin == null && !candidates.isEmpty()) {
+                origin = candidates.get(0);
+            }
+        }
+
+        String fieldId = origin != null ? origin.fieldId() : null;
+        ExtractedField field = fieldFor(resolved.fieldIndex(), fieldId, extractedFields);
+
+        return new ExplainedMapping(
+                rowIndex,
+                resolved.fieldIndex(),
+                fieldId,
+                resolved.columnIndex(),
+                resolved.value(),
+                resolved.confidence(),
+                resolved.source().name(),
+                origin != null ? origin.reason() : null,
+                field != null ? field.pageNumber() : null,
+                field != null ? field.x() : null,
+                field != null ? field.y() : null,
+                field != null ? field.width() : null,
+                field != null ? field.height() : null);
+    }
+
+    /**
+     * The field a mapping came from. A deterministic mapping knows its index outright; a
+     * semantic one only kept the id it was given, so the index is read back out of that -
+     * which is what lets a semantically mapped cell still be drawn on the page preview.
+     */
+    private ExtractedField fieldFor(int fieldIndex, String fieldId, List<ExtractedField> extractedFields) {
+        if (fieldIndex >= 0 && fieldIndex < extractedFields.size()) {
+            return extractedFields.get(fieldIndex);
+        }
+        if (fieldId == null || !fieldId.startsWith("field-")) {
+            return null;
+        }
+
+        // "field-3" and "field-3-1" both originate in field 3; the suffix distinguishes
+        // several values pulled out of that one element.
+        String[] parts = fieldId.substring("field-".length()).split("-");
+        try {
+            int index = Integer.parseInt(parts[0]);
+            return index >= 0 && index < extractedFields.size() ? extractedFields.get(index) : null;
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     /**
@@ -257,8 +384,13 @@ public class DocumentProcessingService {
             throw new EmptyFileException("At least one document must be provided");
         }
 
-        try (Workbook workbook = excelService.openWorkbook(template)) {
-            ExcelTemplateInfo templateInfo = excelService.readHeaders(workbook);
+        // With no template the columns come from the first document, so every later
+        // document in the batch is filled against the same inferred header row.
+        documentFileValidator.validate(documents.get(0));
+        PreparedWorkbook prepared = prepareWorkbook(documents.get(0), template);
+
+        try (Workbook workbook = prepared.workbook()) {
+            ExcelTemplateInfo templateInfo = prepared.templateInfo();
 
             int firstColumnIndex = templateInfo.headers().stream()
                     .mapToInt(ExcelColumn::columnIndex)
@@ -268,26 +400,33 @@ public class DocumentProcessingService {
             List<BatchItemResult> results = new ArrayList<>(documents.size());
             int rowIndex = templateInfo.dataRowIndex();
 
-            for (MultipartFile document : documents) {
+            for (int documentIndex = 0; documentIndex < documents.size(); documentIndex++) {
+                MultipartFile document = documents.get(documentIndex);
                 String filename = document.getOriginalFilename();
 
                 try {
                     documentFileValidator.validate(document);
-                    DocumentMapping mapping = computeValuesForDocument(document, templateInfo);
+                    // The first document may already have been parsed to infer the headers;
+                    // reusing that parse keeps the batch to one model call per document.
+                    DocumentMapping mapping = documentIndex == 0
+                            ? mapDocument(document, prepared)
+                            : computeRecordsForDocument(document, templateInfo);
 
                     if (mapping.isEmpty()) {
                         throw new NoExcelMappingsException(mapping.describeEmptyOutcome());
                     }
 
-                    excelService.writeRow(workbook, templateInfo, rowIndex, mapping.valuesByColumn());
+                    // A document that yielded a table contributes several rows, so the next
+                    // document has to start below all of them rather than one row down.
+                    int written = excelService.writeRows(workbook, templateInfo, rowIndex, mapping.valueRows());
                     results.add(new BatchItemResult(filename, true, rowIndex, null));
+                    rowIndex += written;
                 } catch (RuntimeException exception) {
                     excelService.writeRow(workbook, templateInfo, rowIndex,
                             Map.of(firstColumnIndex, "PROCESSING FAILED: " + exception.getMessage()));
                     results.add(new BatchItemResult(filename, false, rowIndex, exception.getMessage()));
+                    rowIndex++;
                 }
-
-                rowIndex++;
             }
 
             return new BatchProcessedExcelFile(COMPLETED_FILENAME, excelService.serialize(workbook), results);
@@ -302,7 +441,7 @@ public class DocumentProcessingService {
      * returned no fields" and "fields were returned but none matched a header" are different
      * problems with different fixes, and reporting them identically hides the real one.
      */
-    private record DocumentMapping(Map<Integer, String> valuesByColumn,
+    private record DocumentMapping(List<MappedRecord> records,
                                    Map<Integer, ResolvedFieldMapping> resolvedByColumn,
                                    List<ExtractedField> extractedFields,
                                    List<SemanticMapping> semanticMappings,
@@ -312,7 +451,12 @@ public class DocumentProcessingService {
                                    boolean semanticStageUsed) {
 
         boolean isEmpty() {
-            return valuesByColumn.isEmpty();
+            return records.isEmpty();
+        }
+
+        /** Just the values, for writing; provenance is only needed by the explanation view. */
+        List<Map<Integer, String>> valueRows() {
+            return records.stream().map(MappedRecord::values).toList();
         }
 
         String describeEmptyOutcome() {
@@ -327,18 +471,53 @@ public class DocumentProcessingService {
         }
     }
 
-    private DocumentMapping computeValuesForDocument(MultipartFile document, ExcelTemplateInfo templateInfo) {
-        ExtractedDocumentData extractedDocumentData =
-                documentUnderstandingService.extractFields(document);
+    /**
+     * Runs the full pipeline for one document: parse it with geometry intact, derive its
+     * structure from those coordinates, map what the structure alone settles, and call the
+     * semantic stage only for what is genuinely left over.
+     */
+    private DocumentMapping computeRecordsForDocument(MultipartFile document, ExcelTemplateInfo templateInfo) {
+        ParsedDocument parsed = safeParse(document);
+        return computeRecords(document, parsed, analyzeLayout(parsed), templateInfo);
+    }
+
+    /**
+     * A provider that reports no geometry - or a stub implementing only the flat API - still
+     * works. There is simply no layout to reason about, and the document follows the
+     * single-record path it always did.
+     */
+    private DocumentLayout analyzeLayout(ParsedDocument parsed) {
+        return parsed.isEmpty()
+                ? DocumentLayout.empty()
+                : layoutAnalyzer.analyze(parsed.elements(), parsed.pages());
+    }
+
+    private DocumentMapping computeRecords(MultipartFile document,
+                                           ParsedDocument parsed,
+                                           DocumentLayout layout,
+                                           ExcelTemplateInfo templateInfo) {
+
+        ExtractedDocumentData extractedDocumentData = parsed.isEmpty()
+                ? documentUnderstandingService.extractFields(document)
+                : parsedDocumentFlattener.flatten(parsed);
+
+        // Structural mapping runs first and costs nothing: a table whose header band matches
+        // the template resolves every one of its rows without a model call.
+        List<MappedRecord> layoutRecords = layoutRecordMapper.mapLayout(templateInfo, layout);
 
         DeterministicMappingResult deterministicMappings =
                 headerFieldMapper.findExactMatches(templateInfo, extractedDocumentData);
 
-        // Only columns the deterministic stage could not fill are still in play. A semantic
-        // mapping onto an already-resolved column is always discarded by choosePreferredMapping
-        // (deterministic confidence is 1.0 and wins ties), so sending those headers to the LLM
-        // can only cost tokens and latency - it can never change the output.
-        List<ExcelColumn> unresolvedHeaders = unresolvedHeaders(templateInfo, deterministicMappings);
+        // Only columns that nothing has filled yet are still in play. A semantic mapping onto
+        // an already-resolved column is always discarded by choosePreferredMapping, so sending
+        // those headers to the LLM can only cost tokens and latency - it can never change the
+        // output. Structural records count as resolved for exactly the same reason.
+        Set<Integer> resolvedColumns = new HashSet<>(deterministicMappings.mappingsByColumn().keySet());
+        for (MappedRecord record : layoutRecords) {
+            resolvedColumns.addAll(record.values().keySet());
+        }
+
+        List<ExcelColumn> unresolvedHeaders = unresolvedHeaders(templateInfo, resolvedColumns);
 
         boolean semanticFallbackCanContribute =
                 !deterministicMappings.unmatchedFields().isEmpty() && !unresolvedHeaders.isEmpty();
@@ -363,20 +542,25 @@ public class DocumentProcessingService {
         Map<Integer, ResolvedFieldMapping> resolvedByColumn =
                 resolveMappingsByColumn(deterministicMappings, semanticMappings, extractedDocumentData);
 
-        Map<Integer, String> valuesByColumn = toValuesByColumn(resolvedByColumn);
+        List<MappedRecord> records =
+                combineRecords(layoutRecords, toValuesByColumn(resolvedByColumn));
 
         // One summary line per document: without it, a document that resolves nothing looks
-        // identical whether extraction, matching, or the semantic stage was responsible.
-        LOGGER.info("Mapping summary for {}: extracted={} deterministic={} unmatched={} semanticStage={} resolved={}",
+        // identical whether extraction, structure, matching, or the semantic stage was
+        // responsible.
+        LOGGER.info("Mapping summary for {}: extracted={} regions={} structural={} deterministic={}"
+                        + " unmatched={} semanticStage={} rows={}",
                 document.getOriginalFilename(),
                 extractedDocumentData.fields().size(),
+                layout.regions().size(),
+                layoutRecords.size(),
                 deterministicMappings.mappingsByColumn().size(),
                 deterministicMappings.unmatchedFields().size(),
                 semanticFallbackCanContribute ? "called" : "skipped",
-                valuesByColumn.size());
+                records.size());
 
         return new DocumentMapping(
-                valuesByColumn,
+                records,
                 resolvedByColumn,
                 extractedDocumentData.fields(),
                 semanticMappings,
@@ -386,10 +570,83 @@ public class DocumentProcessingService {
                 semanticFallbackCanContribute);
     }
 
-    private List<ExcelColumn> unresolvedHeaders(ExcelTemplateInfo templateInfo,
-                                                DeterministicMappingResult deterministicMappings) {
-        Set<Integer> resolvedColumns = deterministicMappings.mappingsByColumn().keySet();
+    /**
+     * The workbook to fill, its columns, and - when no template was supplied and the columns
+     * had to be inferred - the parse those columns came from.
+     *
+     * <p>Carrying the parse matters: inferring headers requires reading the document, and
+     * without this the same document would be sent to the parse model a second time to be
+     * mapped, doubling the cost of every templateless request.
+     */
+    private record PreparedWorkbook(Workbook workbook,
+                                    ExcelTemplateInfo templateInfo,
+                                    ParsedDocument parsed,
+                                    DocumentLayout layout) {
 
+        boolean headersWereInferred() {
+            return parsed != null;
+        }
+    }
+
+    /**
+     * Opens the supplied template, or - when none was supplied - reads the document, works
+     * out what its columns should be, and builds a workbook around them.
+     */
+    private PreparedWorkbook prepareWorkbook(MultipartFile document, MultipartFile template) {
+        if (template != null) {
+            Workbook workbook = excelService.openWorkbook(template);
+            return new PreparedWorkbook(workbook, excelService.readHeaders(workbook), null, null);
+        }
+
+        ParsedDocument parsed = safeParse(document);
+        DocumentLayout layout = analyzeLayout(parsed);
+        List<String> headers = headerInferenceService.inferHeaders(layout);
+
+        if (headers.isEmpty()) {
+            throw new NoExcelMappingsException(
+                    "No Excel template was supplied and the document did not yield any columns"
+                            + " to build one from - it may be blank, too low quality to read, or"
+                            + " in a layout the parse model did not recognise");
+        }
+
+        LOGGER.info("No template supplied for {}; inferred {} columns: {}",
+                document.getOriginalFilename(), headers.size(), headers);
+
+        ExcelService.SynthesizedTemplate synthesized = excelService.createWorkbook(headers);
+        return new PreparedWorkbook(synthesized.workbook(), synthesized.templateInfo(), parsed, layout);
+    }
+
+    private DocumentMapping mapDocument(MultipartFile document, PreparedWorkbook prepared) {
+        return prepared.headersWereInferred()
+                ? computeRecords(document, prepared.parsed(), prepared.layout(), prepared.templateInfo())
+                : computeRecordsForDocument(document, prepared.templateInfo());
+    }
+
+    private ParsedDocument safeParse(MultipartFile document) {
+        ParsedDocument parsed = documentUnderstandingService.parse(document);
+        return parsed == null ? ParsedDocument.empty() : parsed;
+    }
+
+    /**
+     * Folds the flat mapping results into the structural records. Values that describe the
+     * whole document - a labelled field above a table, or anything the semantic stage
+     * resolved - fill columns a row left empty, but never overwrite what the row itself said.
+     */
+    private List<MappedRecord> combineRecords(List<MappedRecord> layoutRecords,
+                                              Map<Integer, String> flatValues) {
+        if (layoutRecords.isEmpty()) {
+            return flatValues.isEmpty() ? List.of() : List.of(MappedRecord.of(flatValues));
+        }
+
+        List<MappedRecord> records = new ArrayList<>(layoutRecords.size());
+        for (MappedRecord layoutRecord : layoutRecords) {
+            records.add(layoutRecord.withDefaults(flatValues));
+        }
+        return records;
+    }
+
+    private List<ExcelColumn> unresolvedHeaders(ExcelTemplateInfo templateInfo,
+                                                Set<Integer> resolvedColumns) {
         if (resolvedColumns.isEmpty()) {
             return templateInfo.headers();
         }

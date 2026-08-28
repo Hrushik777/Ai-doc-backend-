@@ -62,7 +62,13 @@ public class HeaderFieldMapper {
         return new DeterministicMappingResult(mappingsByColumn, unmatchedFields);
     }
 
-    private Map<String, List<ExcelColumn>> indexHeadersByNormalizedName(List<ExcelColumn> headers) {
+    /**
+     * Normalized template header name to the columns carrying it. Public so the layout-aware
+     * mapper resolves headers through exactly the same normalization and alias rules as the
+     * flat path - two matching implementations would drift, and a header that resolved on one
+     * path but not the other would be all but impossible to explain.
+     */
+    public Map<String, List<ExcelColumn>> indexHeadersByNormalizedName(List<ExcelColumn> headers) {
         // Duplicate header names are legal and every matching column must still receive the
         // value, so each normalized name maps to the list of columns that carry it, kept in
         // template order.
@@ -96,13 +102,7 @@ public class HeaderFieldMapper {
             return false;
         }
 
-        String comparableFieldName =
-                HEADER_ALIASES.getOrDefault(
-                        normalizedFieldName,
-                        normalizedFieldName
-                );
-
-        List<ExcelColumn> matchingColumns = columnsByNormalizedHeader.get(comparableFieldName);
+        List<ExcelColumn> matchingColumns = columnsByNormalizedHeader.get(matchKey(normalizedFieldName));
 
         if (matchingColumns == null) {
             return false;
@@ -127,6 +127,12 @@ public class HeaderFieldMapper {
         }
 
         return true;
+    }
+
+    /** Normalizes a name and resolves any known abbreviation, for header lookup. */
+    public String matchKey(String name) {
+        String normalized = headerNameNormalizer.normalize(name);
+        return HEADER_ALIASES.getOrDefault(normalized, normalized);
     }
 
     private ResolvedFieldMapping choosePreferredMapping(ResolvedFieldMapping existing,

@@ -6,11 +6,14 @@ import com.example.ai_doc.model.excel.ExcelColumn;
 import com.example.ai_doc.model.excel.ExcelTemplateInfo;
 import com.example.ai_doc.service.validation.ExcelTemplateValidator;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +29,8 @@ import java.util.Map;
 public class ExcelService {
 
     private static final int INITIAL_WORKBOOK_BUFFER_BYTES = 64 * 1024;
+
+    private static final String GENERATED_SHEET_NAME = "Extracted Data";
 
     private final ExcelTemplateValidator excelTemplateValidator;
     private final int defaultHeaderRowIndex;
@@ -126,6 +131,63 @@ public class ExcelService {
             }
             cell.setCellValue(entry.getValue());
         }
+    }
+
+    /**
+     * Writes consecutive rows starting at {@code startRowIndex} and returns how many were
+     * written.
+     *
+     * <p>One document is not one row. A table or a list produces a record per row, and a
+     * batch has to know how far the previous document advanced before it places the next
+     * one. A labelled key-value document still produces exactly one record, so this is a
+     * superset of the previous single-row behaviour rather than a change to it.
+     */
+    public int writeRows(Workbook workbook,
+                         ExcelTemplateInfo templateInfo,
+                         int startRowIndex,
+                         List<Map<Integer, String>> records) {
+        int rowIndex = startRowIndex;
+        for (Map<Integer, String> record : records) {
+            writeRow(workbook, templateInfo, rowIndex, record);
+            rowIndex++;
+        }
+        return rowIndex - startRowIndex;
+    }
+
+    /**
+     * Builds an empty workbook around a header row that was inferred rather than supplied,
+     * for the case where the caller sent a document but no template.
+     */
+    public SynthesizedTemplate createWorkbook(List<String> headerNames) {
+        if (headerNames == null || headerNames.isEmpty()) {
+            throw new InvalidExcelTemplateException("Cannot build a workbook without any headers");
+        }
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet(GENERATED_SHEET_NAME);
+        Row headerRow = sheet.createRow(0);
+
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+
+        List<ExcelColumn> headers = new ArrayList<>(headerNames.size());
+        for (int columnIndex = 0; columnIndex < headerNames.size(); columnIndex++) {
+            String headerName = headerNames.get(columnIndex);
+            Cell cell = headerRow.createCell(columnIndex);
+            cell.setCellValue(headerName);
+            cell.setCellStyle(headerStyle);
+            headers.add(new ExcelColumn(columnIndex, headerName));
+        }
+
+        return new SynthesizedTemplate(
+                workbook,
+                new ExcelTemplateInfo(GENERATED_SHEET_NAME, 0, 1, headers));
+    }
+
+    /** A generated workbook and the template description that matches it. */
+    public record SynthesizedTemplate(Workbook workbook, ExcelTemplateInfo templateInfo) {
     }
 
     public byte[] serialize(Workbook workbook) {
