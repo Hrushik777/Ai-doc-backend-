@@ -4,6 +4,8 @@ import com.example.ai_doc.globalexception.ExternalAiServiceException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -12,6 +14,8 @@ import org.springframework.web.client.RestClientException;
 /** Small shared HTTP boundary for NVIDIA chat-completion calls. */
 @Component
 public class NvidiaChatCompletionClient {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(NvidiaChatCompletionClient.class);
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -35,7 +39,7 @@ public class NvidiaChatCompletionClient {
             }
             return objectMapper.readTree(responseBody);
         } catch (JacksonException | RestClientException exception) {
-            exception.printStackTrace();
+            LOGGER.warn("NVIDIA {} request failed", operationName, exception);
             throw new ExternalAiServiceException("NVIDIA " + operationName + " request failed", exception);
         }
     }

@@ -44,9 +44,16 @@ public class HeaderFieldMapper {
         Map<Integer, ResolvedFieldMapping> mappingsByColumn = new LinkedHashMap<>();
         List<IndexedExtractedField> unmatchedFields = new ArrayList<>();
 
-        for (int fieldIndex = 0; fieldIndex < extractedDocumentData.fields().size(); fieldIndex++) {
-            ExtractedField field = extractedDocumentData.fields().get(fieldIndex);
-            boolean matched = addExactMatches(fieldIndex, field, templateInfo.headers(), mappingsByColumn);
+        // Normalize the headers once per document instead of once per (field, header) pair.
+        // Matching then costs one hash lookup per field rather than a full scan of the
+        // header list, without changing which columns a field resolves to.
+        Map<String, List<ExcelColumn>> columnsByNormalizedHeader =
+                indexHeadersByNormalizedName(templateInfo.headers());
+
+        List<ExtractedField> fields = extractedDocumentData.fields();
+        for (int fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++) {
+            ExtractedField field = fields.get(fieldIndex);
+            boolean matched = addExactMatches(fieldIndex, field, columnsByNormalizedHeader, mappingsByColumn);
             if (!matched) {
                 unmatchedFields.add(new IndexedExtractedField(fieldIndex, field));
             }
@@ -55,16 +62,37 @@ public class HeaderFieldMapper {
         return new DeterministicMappingResult(mappingsByColumn, unmatchedFields);
     }
 
+    private Map<String, List<ExcelColumn>> indexHeadersByNormalizedName(List<ExcelColumn> headers) {
+        // Duplicate header names are legal and every matching column must still receive the
+        // value, so each normalized name maps to the list of columns that carry it, kept in
+        // template order.
+        Map<String, List<ExcelColumn>> columnsByNormalizedHeader = new LinkedHashMap<>();
+        for (ExcelColumn header : headers) {
+            String normalizedHeaderName = headerNameNormalizer.normalize(header.headerName());
+            if (normalizedHeaderName.isEmpty()) {
+                continue;
+            }
+            columnsByNormalizedHeader
+                    .computeIfAbsent(normalizedHeaderName, key -> new ArrayList<>(1))
+                    .add(header);
+        }
+        return columnsByNormalizedHeader;
+    }
+
     private boolean addExactMatches(
             int fieldIndex,
             ExtractedField field,
-            List<ExcelColumn> headers,
+            Map<String, List<ExcelColumn>> columnsByNormalizedHeader,
             Map<Integer, ResolvedFieldMapping> mappingsByColumn) {
+
+        if (field.value() == null) {
+            return false;
+        }
 
         String normalizedFieldName =
                 headerNameNormalizer.normalize(field.name());
 
-        if (normalizedFieldName.isEmpty() || field.value() == null) {
+        if (normalizedFieldName.isEmpty()) {
             return false;
         }
 
@@ -74,35 +102,31 @@ public class HeaderFieldMapper {
                         normalizedFieldName
                 );
 
-        boolean matched = false;
+        List<ExcelColumn> matchingColumns = columnsByNormalizedHeader.get(comparableFieldName);
 
-        for (ExcelColumn header : headers) {
-
-            String normalizedHeaderName =
-                    headerNameNormalizer.normalize(header.headerName());
-
-            if (comparableFieldName.equals(normalizedHeaderName)) {
-
-                matched = true;
-
-                ResolvedFieldMapping candidate =
-                        new ResolvedFieldMapping(
-                                fieldIndex,
-                                header.columnIndex(),
-                                field.value(),
-                                1.0,
-                                MappingSource.DETERMINISTIC
-                        );
-
-                mappingsByColumn.merge(
-                        header.columnIndex(),
-                        candidate,
-                        this::choosePreferredMapping
-                );
-            }
+        if (matchingColumns == null) {
+            return false;
         }
 
-        return matched;
+        for (ExcelColumn header : matchingColumns) {
+
+            ResolvedFieldMapping candidate =
+                    new ResolvedFieldMapping(
+                            fieldIndex,
+                            header.columnIndex(),
+                            field.value(),
+                            1.0,
+                            MappingSource.DETERMINISTIC
+                    );
+
+            mappingsByColumn.merge(
+                    header.columnIndex(),
+                    candidate,
+                    this::choosePreferredMapping
+            );
+        }
+
+        return true;
     }
 
     private ResolvedFieldMapping choosePreferredMapping(ResolvedFieldMapping existing,

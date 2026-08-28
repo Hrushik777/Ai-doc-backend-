@@ -2,6 +2,8 @@ package com.example.ai_doc.controller;
 
 import com.example.ai_doc.globalexception.AIServiceNotConfiguredException;
 import com.example.ai_doc.globalexception.GlobalExceptionHandler;
+import com.example.ai_doc.model.processing.BatchItemResult;
+import com.example.ai_doc.model.processing.BatchProcessedExcelFile;
 import com.example.ai_doc.model.processing.ProcessedExcelFile;
 import com.example.ai_doc.service.DocumentService;
 import com.example.ai_doc.service.processing.DocumentProcessingService;
@@ -10,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -80,5 +84,32 @@ class DocumentControllerTest {
         mockMvc.perform(multipart("/api/documents/process").file(document).file(template))
                 .andExpect(status().isNotImplemented())
                 .andExpect(content().string("Document understanding is not configured"));
+    }
+
+    @Test
+    void batchProcessEndpointReturnsCompletedExcelWithBatchHeaders() throws Exception {
+        MockMultipartFile document1 = new MockMultipartFile(
+                "documents", "scan1.pdf", "application/pdf", new byte[]{1});
+        MockMultipartFile document2 = new MockMultipartFile(
+                "documents", "scan2.pdf", "application/pdf", new byte[]{2});
+        MockMultipartFile template = new MockMultipartFile(
+                "template", "template.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1});
+        given(documentProcessingService.processBatch(any(), any()))
+                .willReturn(new BatchProcessedExcelFile("completed-document.xlsx", new byte[]{4, 5, 6}, List.of(
+                        new BatchItemResult("scan1.pdf", true, 1, null),
+                        new BatchItemResult("scan2.pdf", false, 2, "Unsupported content type")
+                )));
+
+        mockMvc.perform(multipart("/api/documents/process/batch")
+                        .file(document1).file(document2).file(template))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition", containsString("completed-document.xlsx")))
+                .andExpect(header().string("X-Batch-Total-Count", "2"))
+                .andExpect(header().string("X-Batch-Success-Count", "1"))
+                .andExpect(header().string("X-Batch-Failed-Files", "scan2.pdf"))
+                .andExpect(content().bytes(new byte[]{4, 5, 6}));
     }
 }

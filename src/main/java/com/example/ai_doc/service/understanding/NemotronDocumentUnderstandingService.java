@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.function.Consumer;
 
 /** Converts image documents, and every PDF page, into provider-neutral extracted fields. */
 @Service
@@ -45,41 +46,46 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
 
     @Override
     public ExtractedDocumentData extractFields(MultipartFile document) {
-        List<DocumentPageImage> pages = createPageImages(document);
         List<ExtractedField> fields = new ArrayList<>();
 
-        for (DocumentPageImage page : pages) {
+        // Pages are rendered and consumed one at a time. Materializing every page bitmap up
+        // front held the whole document in memory (megabytes per page at render DPI) for the
+        // entire sequence of Nemotron calls; now only the in-flight page is alive.
+        forEachPage(document, page -> {
             LOGGER.debug("Submitting document page {} to Nemotron Parse", page.pageNumber());
             JsonNode response = nvidiaChatCompletionClient.complete(
                     buildRequest(page), "Nemotron Parse");
             fields.addAll(parseNemotronResponse(response, page.pageNumber()));
-        }
+        });
 
-        for(int i =0; i< fields.size();i++){
-            ExtractedField field = fields.get(i);
-
-            System.out.println(
-                    "FIELD " + i
-                            + " | name=" + field.name()
-                            + " | value=" + field.value()
-                            + " | rawText=" + field.rawText()
-                            + " | x=" + field.x()
-                            + " | y=" + field.y()
-            );
+        if (fields.isEmpty()) {
+            // Downstream this surfaces as "nothing matched", which points the investigation at
+            // the mapping stage when the real problem is here: the parse model gave us nothing
+            // to map. Enable DEBUG on this class to see the raw document elements it returned.
+            LOGGER.warn("Nemotron Parse returned no document elements for {} - nothing to map",
+                    document.getOriginalFilename());
+        } else if (LOGGER.isDebugEnabled()) {
+            for (int i = 0; i < fields.size(); i++) {
+                ExtractedField field = fields.get(i);
+                LOGGER.debug("FIELD {} | name={} | value={} | rawText={} | x={} | y={}",
+                        i, field.name(), field.value(), field.rawText(), field.x(), field.y());
+            }
         }
 
         return new ExtractedDocumentData(fields);
     }
 
-    private List<DocumentPageImage> createPageImages(MultipartFile document) {
+    private void forEachPage(MultipartFile document, Consumer<DocumentPageImage> pageConsumer) {
         String contentType = document.getContentType();
         try {
             if (MediaType.APPLICATION_PDF_VALUE.equals(contentType)) {
-                return pdfDocumentRenderer.renderPages(document.getBytes());
+                pdfDocumentRenderer.renderPages(document.getBytes(), pageConsumer);
+                return;
             }
 
             if (MediaType.IMAGE_PNG_VALUE.equals(contentType) || MediaType.IMAGE_JPEG_VALUE.equals(contentType)) {
-                return List.of(new DocumentPageImage(1, contentType, document.getBytes()));
+                pageConsumer.accept(new DocumentPageImage(1, contentType, document.getBytes()));
+                return;
             }
         } catch (IOException exception) {
             throw new DocumentProcessingException("Failed to read document for Nemotron processing", exception);
@@ -114,6 +120,15 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
             JsonNode argumentRoot = objectMapper.readTree(argumentsJson);
             List<ExtractedField> fields = new ArrayList<>();
             collectDocumentElements(argumentRoot, pageNumber, fields);
+
+            if (fields.isEmpty()) {
+                // The tool call came back, so the model answered - but nothing in the payload
+                // looked like a document element (an object carrying bbox, text and type).
+                // Log the payload so a schema change is visible instead of silent.
+                LOGGER.warn("Page {} produced no document elements from the markdown_bbox payload", pageNumber);
+                LOGGER.debug("markdown_bbox payload for page {}: {}", pageNumber, argumentsJson);
+            }
+
             return fields;
         } catch (JacksonException exception) {
             throw new DocumentProcessingException("Could not parse Nemotron document elements", exception);

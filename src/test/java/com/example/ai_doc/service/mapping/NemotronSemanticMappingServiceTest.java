@@ -25,13 +25,14 @@ class NemotronSemanticMappingServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final NvidiaChatCompletionClient nvidiaClient = mock(NvidiaChatCompletionClient.class);
     private final NemotronSemanticMappingService mappingService = new NemotronSemanticMappingService(
-            nvidiaClient, objectMapper, "nvidia/nemotron-nano-9b-v2", 0.80);
+            nvidiaClient, objectMapper, "nvidia/nemotron-3-super-120b-a12b", 0.80, 4096, true, true);
 
     @Test
     void mapsMawpToMaximumAllowableWorkingPressure() throws Exception {
         given(nvidiaClient.complete(any(), eq("semantic mapping")))
                 .willReturn(mappingResponse("""
-                        {"mappings":[{"fieldIndex":0,"columnIndex":3,"confidence":0.97,
+                        {"mappings":[{"fieldId":"field-0","name":"MAWP","value":"150 psi",
+                        "columnIndex":3,"confidence":0.97,
                         "reason":"MAWP is the common abbreviation"}]}
                         """));
 
@@ -42,14 +43,15 @@ class NemotronSemanticMappingServiceTest {
                 headers());
 
         assertThat(mappings).containsExactly(new SemanticMapping(
-                0, 3, 0.97, "MAWP is the common abbreviation"));
+                "field-0", "MAWP", "150 psi", 3, 0.97, "MAWP is the common abbreviation"));
     }
 
     @Test
     void supportsSynonymMappings() throws Exception {
         given(nvidiaClient.complete(any(), eq("semantic mapping")))
                 .willReturn(mappingResponse("""
-                        {"mappings":[{"fieldIndex":8,"columnIndex":2,"confidence":0.91,
+                        {"mappings":[{"fieldId":"field-8","name":"Mfr","value":"Siemens",
+                        "columnIndex":2,"confidence":0.91,
                         "reason":"Mfr is a common abbreviation for manufacturer"}]}
                         """));
 
@@ -60,7 +62,7 @@ class NemotronSemanticMappingServiceTest {
                 headers());
 
         assertThat(mappings).containsExactly(new SemanticMapping(
-                8, 2, 0.91, "Mfr is a common abbreviation for manufacturer"));
+                "field-8", "Mfr", "Siemens", 2, 0.91, "Mfr is a common abbreviation for manufacturer"));
     }
 
     @Test
@@ -78,7 +80,8 @@ class NemotronSemanticMappingServiceTest {
     void doesNotApplyLowConfidenceMappings() throws Exception {
         given(nvidiaClient.complete(any(), eq("semantic mapping")))
                 .willReturn(mappingResponse("""
-                        {"mappings":[{"fieldIndex":0,"columnIndex":3,"confidence":0.62,
+                        {"mappings":[{"fieldId":"field-0","name":"Pressure","value":"150 psi",
+                        "columnIndex":3,"confidence":0.62,
                         "reason":"Weak evidence"}]}
                         """));
 
@@ -89,9 +92,82 @@ class NemotronSemanticMappingServiceTest {
     }
 
     @Test
+    void discardsMappingsForColumnsThatWereNotOfferedInsteadOfFailingTheDocument() throws Exception {
+        given(nvidiaClient.complete(any(), eq("semantic mapping")))
+                .willReturn(mappingResponse("""
+                        {"mappings":[
+                        {"fieldId":"field-0","name":"Mfr","value":"Siemens",
+                        "columnIndex":2,"confidence":0.95,"reason":"offered column"},
+                        {"fieldId":"field-1","name":"Tag","value":"P-101",
+                        "columnIndex":0,"confidence":0.99,"reason":"column not offered"}]}
+                        """));
+
+        // Only column 2 is still unresolved, so only that header is offered to the model.
+        List<SemanticMapping> mappings = mappingService.mapUnmatchedFields(
+                List.of(new IndexedExtractedField(0, new ExtractedField("Mfr", "Siemens")),
+                        new IndexedExtractedField(1, new ExtractedField("Tag", "P-101"))),
+                List.of(new ExcelColumn(2, "Manufacturer")));
+
+        assertThat(mappings).containsExactly(new SemanticMapping(
+                "field-0", "Mfr", "Siemens", 2, 0.95, "offered column"));
+    }
+
+    @Test
+    void readsJsonThatFollowsAReasoningTrace() throws Exception {
+        given(nvidiaClient.complete(any(), eq("semantic mapping")))
+                .willReturn(mappingResponse("""
+                        <think>The field is labelled Mfr. Manufacturer is column {2}, so I
+                        should map it there. Let me double check the other headers.</think>
+                        Here is the result:
+                        ```json
+                        {"mappings":[{"fieldId":"field-0","name":"Mfr","value":"Siemens",
+                        "columnIndex":2,"confidence":0.91,"reason":"Mfr means manufacturer"}]}
+                        ```
+                        """));
+
+        List<SemanticMapping> mappings = mappingService.mapUnmatchedFields(
+                List.of(new IndexedExtractedField(0, new ExtractedField("Mfr", "Siemens"))), headers());
+
+        assertThat(mappings).containsExactly(new SemanticMapping(
+                "field-0", "Mfr", "Siemens", 2, 0.91, "Mfr means manufacturer"));
+    }
+
+    @Test
+    void reportsTruncationRatherThanBlamingTheJson() throws Exception {
+        // finish_reason=length with a half-written object: the budget ran out mid-answer.
+        given(nvidiaClient.complete(any(), eq("semantic mapping")))
+                .willReturn(truncatedMappingResponse("""
+                        {"mappings":[{"fieldId":"field-0","name":"Mfr","value":"Sie
+                        """));
+
+        assertThatThrownBy(() -> mappingService.mapUnmatchedFields(
+                List.of(new IndexedExtractedField(0, new ExtractedField("Mfr", "Siemens"))), headers()))
+                .isInstanceOf(DocumentProcessingException.class)
+                .hasMessageContaining("ran out of output tokens");
+    }
+
+    @Test
+    void retriesWithoutProviderConstraintsWhenTheEndpointRejectsThem() throws Exception {
+        // Endpoints that do not accept response_format / chat_template_kwargs reject the
+        // constrained first attempt; the unconstrained retry must still produce mappings.
+        given(nvidiaClient.complete(any(), eq("semantic mapping")))
+                .willThrow(new ExternalAiServiceException("NVIDIA semantic mapping request failed"))
+                .willReturn(mappingResponse("""
+                        {"mappings":[{"fieldId":"field-0","name":"Mfr","value":"Siemens",
+                        "columnIndex":2,"confidence":0.91,"reason":"recovered on retry"}]}
+                        """));
+
+        List<SemanticMapping> mappings = mappingService.mapUnmatchedFields(
+                List.of(new IndexedExtractedField(0, new ExtractedField("Mfr", "Siemens"))), headers());
+
+        assertThat(mappings).containsExactly(new SemanticMapping(
+                "field-0", "Mfr", "Siemens", 2, 0.91, "recovered on retry"));
+    }
+
+    @Test
     void rejectsInvalidJsonFromTheMappingModel() throws Exception {
         given(nvidiaClient.complete(any(), eq("semantic mapping")))
-                .willReturn(mappingResponse("not json"));
+                .willReturn(mappingResponse("{ this is not valid json }"));
 
         assertThatThrownBy(() -> mappingService.mapUnmatchedFields(
                 List.of(new IndexedExtractedField(0, new ExtractedField("MAWP", "150 psi"))), headers()))
@@ -121,6 +197,12 @@ class NemotronSemanticMappingServiceTest {
     private JsonNode mappingResponse(String content) throws Exception {
         return objectMapper.readTree("""
                 {"choices":[{"message":{"content":%s}}]}
+                """.formatted(objectMapper.writeValueAsString(content)));
+    }
+
+    private JsonNode truncatedMappingResponse(String content) throws Exception {
+        return objectMapper.readTree("""
+                {"choices":[{"finish_reason":"length","message":{"content":%s}}]}
                 """.formatted(objectMapper.writeValueAsString(content)));
     }
 }

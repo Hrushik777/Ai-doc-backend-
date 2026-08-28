@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Component
 public class PdfDocumentRenderer {
@@ -20,17 +21,26 @@ public class PdfDocumentRenderer {
     private static final float RENDER_DPI = 150;
 
     public List<DocumentPageImage> renderPages(byte[] pdfContent) {
+        List<DocumentPageImage> pages = new ArrayList<>();
+        renderPages(pdfContent, pages::add);
+        return pages;
+    }
+
+    /**
+     * Renders each page in turn and hands it straight to {@code pageConsumer}, so a caller
+     * that processes pages sequentially never holds more than one page bitmap at a time.
+     */
+    public void renderPages(byte[] pdfContent, Consumer<DocumentPageImage> pageConsumer) {
         try (PDDocument pdfDocument = Loader.loadPDF(pdfContent)) {
-            if (pdfDocument.getNumberOfPages() == 0) {
+            int pageCount = pdfDocument.getNumberOfPages();
+            if (pageCount == 0) {
                 throw new DocumentProcessingException("PDF does not contain any pages");
             }
 
             PDFRenderer renderer = new PDFRenderer(pdfDocument);
-            List<DocumentPageImage> pages = new ArrayList<>();
-            for (int pageIndex = 0; pageIndex < pdfDocument.getNumberOfPages(); pageIndex++) {
-                pages.add(renderPage(renderer, pageIndex));
+            for (int pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+                pageConsumer.accept(renderPage(renderer, pageIndex));
             }
-            return pages;
         } catch (IOException exception) {
             throw new DocumentProcessingException("Failed to render PDF pages for document understanding", exception);
         }
@@ -38,11 +48,21 @@ public class PdfDocumentRenderer {
 
     private DocumentPageImage renderPage(PDFRenderer renderer, int pageIndex) throws IOException {
         BufferedImage image = renderer.renderImageWithDPI(pageIndex, RENDER_DPI, ImageType.RGB);
-        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            if (!ImageIO.write(image, "png", outputStream)) {
-                throw new DocumentProcessingException("PNG image writing is not available for PDF rendering");
-            }
-            return new DocumentPageImage(pageIndex + 1, "image/png", outputStream.toByteArray());
+
+        // Size the buffer from the rendered bitmap instead of letting it start at 32 bytes and
+        // double its way up, which reallocated and copied the whole page image on every growth.
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream(estimatedPngSize(image));
+        if (!ImageIO.write(image, "png", outputStream)) {
+            throw new DocumentProcessingException("PNG image writing is not available for PDF rendering");
         }
+        return new DocumentPageImage(pageIndex + 1, "image/png", outputStream.toByteArray());
+    }
+
+    private int estimatedPngSize(BufferedImage image) {
+        // Rendered document pages are mostly white, so PNG compresses hard. An eighth of the
+        // raw RGB size is a generous starting point that still avoids repeated growth.
+        long rawSize = (long) image.getWidth() * image.getHeight() * 3L;
+        long estimate = Math.max(rawSize / 8L, 64L * 1024L);
+        return (int) Math.min(estimate, 16L * 1024L * 1024L);
     }
 }

@@ -1,6 +1,7 @@
 package com.example.ai_doc.service.mapping;
 
 import com.example.ai_doc.globalexception.DocumentProcessingException;
+import com.example.ai_doc.globalexception.ExternalAiServiceException;
 import com.example.ai_doc.model.document.ExtractedField;
 import com.example.ai_doc.model.excel.ExcelColumn;
 import com.example.ai_doc.model.mapping.IndexedExtractedField;
@@ -12,9 +13,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,6 +26,8 @@ import java.util.Set;
 /** Uses NVIDIA's reasoning model only after deterministic header matching has failed. */
 @Service
 public class NemotronSemanticMappingService implements SemanticMappingService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(NemotronSemanticMappingService.class);
 
     private static final String SYSTEM_PROMPT = """
     /no_think
@@ -80,9 +86,17 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
     - Do not assign one source element's complete value to every Excel
       column.
     - Do not create logical fields merely because words appear inside prose.
-    - Do not split a generic Text, Caption, Title, Section-header, or
-      explanatory paragraph into multiple fields unless the source itself
-      clearly provides a labeled value structure.
+
+    - A source element can itself BE the value for an Excel header even when
+      it carries no explicit "Label: value" structure. Judge by what the
+      element's content IS, not by the element type reported for it.
+      For example, in a CV or profile document:
+        a heading holding a person's name is the value for a "Name" header;
+        a list of technologies is the value for a "Skills" header;
+        a job or degree entry is the value for an "Experience" or
+        "Education" header.
+      Documents that use headings, lists and sections instead of labeled
+      fields are normal, and must still be mapped.
 
     PROSE AND CONTEXT RULES:
 
@@ -94,11 +108,17 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
       appears somewhere in rawText.
     - Do not extract words from explanatory text and treat them as values.
     - Do not infer a missing value from surrounding text.
-    - Do not map titles, captions, headings, descriptions, explanatory
-      paragraphs, or unrelated document content unless that same source
-      field clearly contains an actual labeled value that belongs to an
-      Excel header.
+    - Do not map an element that is merely ABOUT a header, or that only
+      mentions it in passing, rather than being the header's actual value.
     - Prefer no mapping over an uncertain, inferred, or context-only mapping.
+
+    The distinction that matters is grounding, not element type:
+      map an element when its own content is what the header asks for;
+      do not map an element that only talks about the header.
+    So a heading reading "SHIVAM KUMAR" IS the value for "Name",
+    while the sentence "This document tests Mfr and MAWP abbreviations"
+    is NOT a value for "Manufacturer" or "Maximum Allowable Working
+    Pressure" - it only mentions them.
 
     MATCHING RULES:
 
@@ -163,22 +183,51 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
     }
     """;
 
+    private static final String STRICT_JSON_REMINDER = """
+    Your previous response could not be parsed as JSON. Respond again with ONLY a single
+    valid JSON object matching the schema shown earlier - no explanations, no prose,
+    no markdown fences, no text before or after the JSON. Every mapping entry must use
+    exactly the keys fieldId, name, value, columnIndex, confidence, reason.
+    """;
+
+    private static final int MAX_MAPPING_ATTEMPTS = 2;
+
+    private static final String THINK_OPEN_TAG = "<think>";
+    private static final String THINK_CLOSE_TAG = "</think>";
+
+    private static final String TRUNCATED_RESPONSE_MESSAGE =
+            "Semantic mapping model ran out of output tokens before completing its JSON object"
+                    + " - raise nvidia.mapping.max-tokens, or use a mapping model that does not"
+                    + " spend the budget on reasoning";
+
     private final NvidiaChatCompletionClient nvidiaChatCompletionClient;
     private final ObjectMapper objectMapper;
     private final String mappingModel;
     private final double confidenceThreshold;
+    private final int maxTokens;
+    private final boolean jsonMode;
+    private final boolean disableThinking;
 
     public NemotronSemanticMappingService(NvidiaChatCompletionClient nvidiaChatCompletionClient,
                                           ObjectMapper objectMapper,
-                                          @Value("${nvidia.mapping.model:nvidia/nemotron-nano-9b-v2}") String mappingModel,
-                                          @Value("${app.mapping.llm.confidence-threshold:0.80}") double confidenceThreshold) {
+                                          @Value("${nvidia.mapping.model:nvidia/nemotron-3-super-120b-a12b}") String mappingModel,
+                                          @Value("${app.mapping.llm.confidence-threshold:0.80}") double confidenceThreshold,
+                                          @Value("${nvidia.mapping.max-tokens:4096}") int maxTokens,
+                                          @Value("${nvidia.mapping.json-mode:true}") boolean jsonMode,
+                                          @Value("${nvidia.mapping.disable-thinking:true}") boolean disableThinking) {
         if (confidenceThreshold < 0 || confidenceThreshold > 1) {
             throw new IllegalArgumentException("app.mapping.llm.confidence-threshold must be between 0 and 1");
+        }
+        if (maxTokens <= 0) {
+            throw new IllegalArgumentException("nvidia.mapping.max-tokens must be greater than 0");
         }
         this.nvidiaChatCompletionClient = nvidiaChatCompletionClient;
         this.objectMapper = objectMapper;
         this.mappingModel = mappingModel;
         this.confidenceThreshold = confidenceThreshold;
+        this.maxTokens = maxTokens;
+        this.jsonMode = jsonMode;
+        this.disableThinking = disableThinking;
     }
 
     @Override
@@ -188,18 +237,46 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
             return List.of();
         }
 
-        JsonNode response = nvidiaChatCompletionClient.complete(
-                buildRequest(unmatchedFields, headers), "semantic mapping");
-        SemanticMappingResponse mappingResponse = parseMappingResponse(response);
-        validateMappings(mappingResponse.mappings(), unmatchedFields, headers);
+        SemanticMappingResponse mappingResponse = null;
+        RuntimeException lastFailure = null;
 
-        return mappingResponse.mappings().stream()
+        // Attempt 1 asks the endpoint to constrain decoding to JSON and to switch reasoning
+        // off, which is what stops prose and truncation happening at all. Attempt 2 drops both
+        // constraints (in case this model or endpoint rejects them), adds a stricter reminder,
+        // and doubles the token budget.
+        for (int attempt = 1; attempt <= MAX_MAPPING_ATTEMPTS; attempt++) {
+            boolean useProviderConstraints = attempt == 1 && (jsonMode || disableThinking);
+
+            try {
+                JsonNode response = nvidiaChatCompletionClient.complete(
+                        buildRequest(unmatchedFields, headers, attempt, useProviderConstraints),
+                        "semantic mapping");
+                mappingResponse = parseMappingResponse(response);
+                lastFailure = null;
+                break;
+            } catch (DocumentProcessingException | ExternalAiServiceException failure) {
+                lastFailure = failure;
+                if (attempt < MAX_MAPPING_ATTEMPTS) {
+                    LOGGER.warn("Semantic mapping attempt {} failed ({}); retrying without provider constraints"
+                                    + " and a larger token budget",
+                            attempt, failure.getMessage());
+                }
+            }
+        }
+
+        if (lastFailure != null) {
+            throw lastFailure;
+        }
+
+        return validateMappings(mappingResponse.mappings(), headers).stream()
                 .filter(mapping -> mapping.confidence() >= confidenceThreshold)
                 .toList();
     }
 
     private ObjectNode buildRequest(List<IndexedExtractedField> unmatchedFields,
-                                    List<ExcelColumn> headers) {
+                                    List<ExcelColumn> headers,
+                                    int attempt,
+                                    boolean useProviderConstraints) {
         ObjectNode document = objectMapper.createObjectNode();
         ArrayNode documentFields = document.putArray("documentFields");
 
@@ -218,7 +295,15 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                     indexedField.fieldIndex()
             );
 
-            if (field.name() != null) {
+            // When an element carries no "Label: value" structure, extraction falls back to
+            // using the layout block type ("Text", "Section-header", "List-item") as the field
+            // name. Forwarding that tells the model the field is literally *called*
+            // "Section-header", so it correctly refuses to match it to a header like "Name".
+            // Omit the placeholder and let the model judge from the content and type instead.
+            boolean nameIsBlockTypePlaceholder =
+                    field.name() != null && field.name().equals(field.sourceType());
+
+            if (field.name() != null && !nameIsBlockTypePlaceholder) {
                 documentField.put("name", field.name());
             }
 
@@ -272,86 +357,177 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                 .put("role", "user")
                 .put("content", document.toString());
 
+        ArrayNode messages = objectMapper.createArrayNode().add(systemMessage).add(userMessage);
+
+        if (attempt > 1) {
+            messages.add(objectMapper.createObjectNode()
+                    .put("role", "user")
+                    .put("content", STRICT_JSON_REMINDER));
+        }
+
         ObjectNode request = objectMapper.createObjectNode();
         request.put("model", mappingModel);
-        request.set("messages", objectMapper.createArrayNode().add(systemMessage).add(userMessage));
+        request.set("messages", messages);
         request.put("temperature", 0);
-        request.put("max_tokens", 2048);
+        // Temperature is 0, so a retry only differs by the stricter reminder, a larger budget,
+        // and dropping the provider constraints - which is what recovers a truncated response.
+        request.put("max_tokens", maxTokens * attempt);
+
+        if (useProviderConstraints) {
+            if (jsonMode) {
+                // Constrained decoding: the endpoint will not let the model emit anything but a
+                // JSON object, which removes prose and reasoning traces at the source instead of
+                // leaving us to scrape them off afterwards.
+                request.set("response_format",
+                        objectMapper.createObjectNode().put("type", "json_object"));
+            }
+            if (disableThinking) {
+                // Reasoning models spend their output budget thinking before answering, which is
+                // what truncates the JSON. The prompt's /no_think token only works on some
+                // Nemotron builds; this is the chat-template level switch.
+                request.set("chat_template_kwargs",
+                        objectMapper.createObjectNode().put("thinking", false));
+            }
+        }
+
         return request;
     }
 
     private SemanticMappingResponse parseMappingResponse(JsonNode response) {
-        JsonNode content = response.path("choices")
-                .path(0)
-                .path("message")
-                .path("content");
+        JsonNode choice = response.path("choices").path(0);
+
+        // finish_reason=length means the model hit its token ceiling mid-answer. That is the
+        // usual cause of a half-written JSON object, so it gets its own actionable message
+        // instead of a generic "invalid JSON".
+        boolean truncated = "length".equals(choice.path("finish_reason").asText(""));
+
+        JsonNode content = choice.path("message").path("content");
 
         if (!content.isTextual() || content.asText().isBlank()) {
-            throw new DocumentProcessingException(
-                    "Semantic mapping model returned no JSON content");
+            throw new DocumentProcessingException(truncated
+                    ? TRUNCATED_RESPONSE_MESSAGE
+                    : "Semantic mapping model returned no JSON content");
         }
-        System.out.println("===== MAPPING MODEL RESPONSE =====");
-        System.out.println(content.asText());
-        System.out.println("=================================");
 
         String raw = content.asText().trim();
+        LOGGER.debug("Semantic mapping model response: {}", raw);
 
-        // Remove Markdown code fences if the model added them.
-        if (raw.startsWith("```")) {
-            int firstNewline = raw.indexOf('\n');
-            int lastFence = raw.lastIndexOf("```");
+        String json = extractJsonObject(raw);
 
-            if (firstNewline >= 0 && lastFence > firstNewline) {
-                raw = raw.substring(firstNewline + 1, lastFence).trim();
-            }
+        if (json == null) {
+            throw new DocumentProcessingException(truncated
+                    ? TRUNCATED_RESPONSE_MESSAGE
+                    : "Semantic mapping model did not return a JSON object");
         }
-
-        // Find the actual JSON object if the model added extra text.
-        int start = raw.indexOf('{');
-        int end = raw.lastIndexOf('}');
-
-        if (start < 0 || end <= start) {
-            throw new DocumentProcessingException(
-                    "Semantic mapping model did not return a JSON object");
-        }
-
-        String json = raw.substring(start, end + 1);
 
         try {
-            return objectMapper.readValue(
-                    json,
-                    SemanticMappingResponse.class);
+            return objectMapper.readValue(json, SemanticMappingResponse.class);
         } catch (JacksonException exception) {
-            throw new DocumentProcessingException(
-                    "Semantic mapping model returned invalid JSON",
+            throw new DocumentProcessingException(truncated
+                    ? TRUNCATED_RESPONSE_MESSAGE
+                    : "Semantic mapping model returned invalid JSON",
                     exception);
         }
     }
 
-    private void validateMappings(
+    /**
+     * Pulls the first complete, brace-balanced JSON object out of a response that may also
+     * carry reasoning traces, prose commentary, or Markdown fences around it. Scanning for a
+     * balanced object is what makes this safe: taking everything between the first '{' and the
+     * last '}' swallowed any stray brace in the surrounding prose and produced invalid JSON.
+     * Returns null when the response contains no complete object.
+     */
+    private String extractJsonObject(String raw) {
+        String text = stripReasoningBlocks(raw);
+
+        int start = text.indexOf('{');
+        if (start < 0) {
+            return null;
+        }
+
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = start; i < text.length(); i++) {
+            char character = text.charAt(i);
+
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (character == '\\') {
+                    escaped = true;
+                } else if (character == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (character == '"') {
+                inString = true;
+            } else if (character == '{') {
+                depth++;
+            } else if (character == '}') {
+                depth--;
+                if (depth == 0) {
+                    return text.substring(start, i + 1);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String stripReasoningBlocks(String raw) {
+        // Reasoning models wrap their scratch work in <think>...</think>. An unterminated block
+        // means the token budget ran out mid-thought, so nothing usable follows it.
+        if (raw.indexOf(THINK_OPEN_TAG) < 0) {
+            return raw;
+        }
+
+        StringBuilder cleaned = new StringBuilder(raw.length());
+        int index = 0;
+
+        while (index < raw.length()) {
+            int openTag = raw.indexOf(THINK_OPEN_TAG, index);
+            if (openTag < 0) {
+                cleaned.append(raw, index, raw.length());
+                break;
+            }
+
+            cleaned.append(raw, index, openTag);
+            int closeTag = raw.indexOf(THINK_CLOSE_TAG, openTag);
+            if (closeTag < 0) {
+                break;
+            }
+            index = closeTag + THINK_CLOSE_TAG.length();
+        }
+
+        return cleaned.toString();
+    }
+
+    private List<SemanticMapping> validateMappings(
             List<SemanticMapping> mappings,
-            List<IndexedExtractedField> unmatchedFields,
             List<ExcelColumn> headers) {
 
-        Set<Integer> validFieldIndexes = unmatchedFields.stream()
-                .map(IndexedExtractedField::fieldIndex)
-                .collect(java.util.stream.Collectors.toSet());
+        Set<Integer> offeredColumnIndexes = new HashSet<>(headers.size());
+        for (ExcelColumn header : headers) {
+            offeredColumnIndexes.add(header.columnIndex());
+        }
 
-        Set<Integer> validColumnIndexes = headers.stream()
-                .map(ExcelColumn::columnIndex)
-                .collect(java.util.stream.Collectors.toSet());
-
-        Set<String> seenFieldIds = new java.util.HashSet<>();
+        Set<String> seenFieldIds = new HashSet<>();
+        List<SemanticMapping> usableMappings = new ArrayList<>(mappings.size());
 
         for (SemanticMapping mapping : mappings) {
 
+            // A malformed mapping means the model ignored the response contract, so the
+            // document still fails loudly rather than silently losing data.
             if (mapping.fieldId() == null
                     || mapping.fieldId().isBlank()
                     || mapping.name() == null
                     || mapping.name().isBlank()
                     || mapping.value() == null
                     || mapping.value().isBlank()
-                    || !validColumnIndexes.contains(mapping.columnIndex())
                     || !Double.isFinite(mapping.confidence())
                     || mapping.confidence() < 0
                     || mapping.confidence() > 1
@@ -360,6 +536,19 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
                 throw new DocumentProcessingException(
                         "Semantic mapping model returned an invalid mapping");
             }
+
+            // Only unresolved columns are offered to the model. A mapping onto a column we
+            // deliberately withheld is well-formed but unusable - the deterministic value for
+            // that column wins regardless - so it is dropped instead of failing the document.
+            if (!offeredColumnIndexes.contains(mapping.columnIndex())) {
+                LOGGER.debug("Discarding semantic mapping for column {} which was not offered to the model",
+                        mapping.columnIndex());
+                continue;
+            }
+
+            usableMappings.add(mapping);
         }
+
+        return usableMappings;
     }
 }

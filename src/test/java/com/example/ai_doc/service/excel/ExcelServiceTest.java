@@ -5,6 +5,7 @@ import com.example.ai_doc.model.excel.ExcelTemplateInfo;
 import com.example.ai_doc.service.validation.ExcelTemplateValidator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
@@ -76,6 +77,36 @@ class ExcelServiceTest {
             assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("125 PSI");
             assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("keep this value");
             assertThat(sheet.getRow(3).getCell(3).getStringCellValue()).isEqualTo("unrelated cell");
+        }
+    }
+
+    @Test
+    void writeRowWritesToTheSpecifiedRowIndexAcrossMultipleCallsOnAnOpenWorkbook() throws IOException {
+        MockMultipartFile template = xlsxTemplate(workbook -> {
+            Sheet sheet = workbook.createSheet("Measurements");
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("Pressure");
+            headerRow.createCell(1).setCellValue("Temperature");
+            sheet.createRow(5).createCell(3).setCellValue("unrelated cell");
+        });
+
+        try (Workbook workbook = excelService.openWorkbook(template)) {
+            ExcelTemplateInfo templateInfo = excelService.readHeaders(workbook);
+
+            excelService.writeRow(workbook, templateInfo, 1, Map.of(0, "125 PSI", 1, "80 C"));
+            excelService.writeRow(workbook, templateInfo, 2, Map.of(0, "130 PSI", 1, "82 C"));
+
+            byte[] result = excelService.serialize(workbook);
+
+            try (XSSFWorkbook reopened = new XSSFWorkbook(new java.io.ByteArrayInputStream(result))) {
+                Sheet sheet = reopened.getSheet("Measurements");
+                assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Pressure");
+                assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("125 PSI");
+                assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("80 C");
+                assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("130 PSI");
+                assertThat(sheet.getRow(2).getCell(1).getStringCellValue()).isEqualTo("82 C");
+                assertThat(sheet.getRow(5).getCell(3).getStringCellValue()).isEqualTo("unrelated cell");
+            }
         }
     }
 
