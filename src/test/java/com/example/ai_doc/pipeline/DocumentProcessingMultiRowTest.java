@@ -206,7 +206,58 @@ class DocumentProcessingMultiRowTest {
         }
     }
 
+    /**
+     * A template the user has already been filling in. Before write modes existed, this
+     * document's three rows landed on rows 1-3 and destroyed both of the user's, with no
+     * warning and no way to opt out.
+     */
+    @Test
+    void aTemplateThatAlreadyHasDataKeepsItAndTakesTheNewRowsBelow() throws IOException {
+        given(understandingService.parse(any())).willReturn(equipmentTable());
+
+        ProcessedExcelFile result = processingService.process(pdf("scan.pdf"), templateWithExistingRows());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(result.content()))) {
+            Sheet sheet = workbook.getSheet("Equipment");
+
+            // The user's own two rows, untouched.
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("EXISTING-1");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("EXISTING-2");
+
+            // The document's three rows, beneath them.
+            assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isEqualTo("P-101");
+            assertThat(sheet.getRow(4).getCell(0).getStringCellValue()).isEqualTo("P-102");
+            assertThat(sheet.getRow(5).getCell(0).getStringCellValue()).isEqualTo("V-201");
+            assertThat(sheet.getRow(6)).isNull();
+        }
+    }
+
     // ------------------------------------------------------------------------- fixtures
+
+    private MockMultipartFile templateWithExistingRows() throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Equipment");
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("Tag");
+            headerRow.createCell(1).setCellValue("Type");
+            headerRow.createCell(2).setCellValue("Pressure");
+
+            for (int i = 1; i <= 2; i++) {
+                Row row = sheet.createRow(i);
+                row.createCell(0).setCellValue("EXISTING-" + i);
+                row.createCell(1).setCellValue("User Entered");
+                row.createCell(2).setCellValue("42 psi");
+            }
+
+            workbook.write(outputStream);
+            return new MockMultipartFile(
+                    "template",
+                    "template.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    outputStream.toByteArray());
+        }
+    }
 
     private ParsedDocument equipmentTable() {
         String[][] rows = {

@@ -1,16 +1,16 @@
 # Graph Report - ai-doc  (2026-08-29)
 
 ## Corpus Check
-- 128 files · ~47,489 words
+- 130 files · ~49,521 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 758 nodes · 2427 edges · 47 communities (40 shown, 7 thin omitted)
-- Extraction: 88% EXTRACTED · 12% INFERRED · 0% AMBIGUOUS · INFERRED: 298 edges (avg confidence: 0.81)
+- 793 nodes · 2554 edges · 54 communities (43 shown, 11 thin omitted)
+- Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 289 edges (avg confidence: 0.81)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7fd5a85e`
+- Built from commit: `1ae00f43`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,10 +19,10 @@
 - ExcelService
 - org.springframework.http.ResponseEntity
 - ExcelColumn
+- DocumentLayout
 - org.junit.jupiter.api.Test
-- Document
 - What You Must Do When Invoked
-- .process
+- Document
 - graphify reference: extra exports and benchmark
 - mvnw
 - DocumentElement
@@ -43,18 +43,25 @@
 - .sanitize
 - CorsConfiguration
 - DocumentProcessingService.java
+- org.springframework.stereotype.Component
+- LayoutRegion
+- BBox
+- .analyze
+- SemanticMappingValidationTest
+- LayoutAnalyzerTest.java
+- TableCellSplitter
 
 ## God Nodes (most connected - your core abstractions)
 1. `DocumentElement` - 55 edges
-2. `DocumentProcessingService` - 49 edges
+2. `DocumentProcessingService` - 51 edges
 3. `BBox` - 45 edges
 4. `ExcelColumn` - 39 edges
 5. `ExtractedDocumentData` - 37 edges
-6. `LayoutRegion` - 34 edges
-7. `ExcelTemplateInfo` - 31 edges
-8. `DocumentLayout` - 28 edges
-9. `DocumentProcessingException` - 27 edges
-10. `LayoutRecordMapper` - 27 edges
+6. `ExcelTemplateInfo` - 36 edges
+7. `LayoutRegion` - 34 edges
+8. `ExcelService` - 31 edges
+9. `DocumentProcessingException` - 28 edges
+10. `DocumentLayout` - 28 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `DocumentController` --references--> `DocumentService`  [EXTRACTED]
@@ -71,39 +78,39 @@
 ## Import Cycles
 - None detected.
 
-## Communities (47 total, 7 thin omitted)
+## Communities (54 total, 11 thin omitted)
 
 ### Community 0 - "DocumentProcessingException"
 Cohesion: 0.07
 Nodes (25): java.awt.image.BufferedImage, org.apache.pdfbox.rendering.PDFRenderer, org.slf4j.Logger, org.springframework.stereotype.Service, org.springframework.web.client.RestClient, PDFRenderer, DocumentProcessingException, ExternalAiServiceException (+17 more)
 
 ### Community 1 - "ExcelService"
-Cohesion: 0.16
-Nodes (8): FunctionalInterface, org.apache.poi.ss.usermodel.Workbook, InvalidExcelTemplateException, ExcelService, SynthesizedTemplate, ExcelServiceTest, MockMultipartFile, WorkbookCustomizer
+Cohesion: 0.09
+Nodes (18): FunctionalInterface, org.apache.poi.ss.usermodel.Row, org.apache.poi.ss.usermodel.Sheet, org.apache.poi.ss.usermodel.Workbook, org.apache.poi.xssf.usermodel.XSSFWorkbook, InvalidExcelTemplateException, ExcelWriteMode, APPEND_ONLY (+10 more)
 
 ### Community 2 - "org.springframework.http.ResponseEntity"
 Cohesion: 0.28
 Nodes (8): org.springframework.http.HttpStatus, org.springframework.http.ResponseEntity, org.springframework.web.bind.annotation.ExceptionHandler, org.springframework.web.bind.annotation.RestControllerAdvice, org.springframework.web.multipart.MaxUploadSizeExceededException, org.springframework.web.multipart.support.MissingServletRequestPartException, ApiErrorResponse, GlobalExceptionHandler
 
 ### Community 3 - "ExcelColumn"
-Cohesion: 0.08
-Nodes (16): org.apache.poi.ss.usermodel.Row, org.apache.poi.xssf.usermodel.XSSFWorkbook, org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable, org.junit.jupiter.api.condition.EnabledIfSystemProperty, org.springframework.mock.web.MockMultipartFile, org.springframework.test.context.DynamicPropertyRegistry, org.springframework.test.context.DynamicPropertySource, ExtractedDocumentData (+8 more)
+Cohesion: 0.06
+Nodes (21): org.junit.jupiter.api.condition.EnabledIfSystemProperty, org.springframework.beans.factory.annotation.Autowired, org.springframework.test.context.DynamicPropertyRegistry, org.springframework.test.context.DynamicPropertySource, ExtractedDocumentData, ExtractedField, ExcelColumn, ExcelTemplateInfo (+13 more)
 
-### Community 4 - "org.junit.jupiter.api.Test"
-Cohesion: 0.08
-Nodes (11): org.junit.jupiter.api.Test, org.springframework.boot.test.context.SpringBootTest, DocumentLayout, PageGeometry, LayoutHeaderInferrer, Override, AiDocApplicationTests, LayoutAnalyzerTest (+3 more)
+### Community 4 - "DocumentLayout"
+Cohesion: 0.25
+Nodes (3): DocumentLayout, LayoutHeaderInferrer, LayoutHeaderInferrerTest
 
-### Community 5 - "Document"
-Cohesion: 0.05
-Nodes (15): Entity, org.springframework.beans.factory.annotation.Autowired, org.springframework.data.jpa.repository.JpaRepository, org.springframework.stereotype.Repository, EmptyFileException, FileSizeExceededException, InvalidFileTypeException, Document (+7 more)
+### Community 5 - "org.junit.jupiter.api.Test"
+Cohesion: 0.09
+Nodes (19): org.junit.jupiter.api.BeforeEach, org.junit.jupiter.api.Test, org.springframework.mock.web.MockMultipartFile, org.springframework.test.web.servlet.MockMvc, AIServiceNotConfiguredException, EmptyFileException, FileSizeExceededException, InvalidFileTypeException (+11 more)
 
 ### Community 6 - "What You Must Do When Invoked"
 Cohesion: 0.07
 Nodes (26): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+18 more)
 
-### Community 7 - ".process"
-Cohesion: 0.20
-Nodes (7): HeaderNameNormalizer, ExcelTemplateValidator, DocumentProcessingMultiRowTest, MockMultipartFile, DocumentProcessingServiceTest, MockMultipartFile, XSSFWorkbook
+### Community 7 - "Document"
+Cohesion: 0.11
+Nodes (7): Entity, org.springframework.data.jpa.repository.JpaRepository, org.springframework.stereotype.Repository, Document, DocumentRepository, DocumentService, Table
 
 ### Community 8 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -114,12 +121,12 @@ Cohesion: 0.38
 Nodes (8): mvnw script, clean(), die(), exec_maven(), hash_string(), set_java_home(), trim(), verbose()
 
 ### Community 10 - "DocumentElement"
-Cohesion: 0.05
-Nodes (23): java.util.regex.Pattern, org.springframework.stereotype.Component, BBox, ContinuationCandidate, DocumentElement, LayoutCell, LayoutRegion, LayoutRow (+15 more)
+Cohesion: 0.15
+Nodes (7): DocumentElement, ColumnAssignment, ColumnClusterer, Geometry, LayoutAnalyzer, RowBander, VerticalSlabSplitter
 
 ### Community 11 - "LayoutRecordMapper"
-Cohesion: 0.17
-Nodes (6): CellOrigin, MappedRecord, CarriedHeaderBand, LayoutRecordMapper, RegionMapping, RegionReading
+Cohesion: 0.11
+Nodes (7): MappedRecord, CarriedHeaderBand, LayoutRecordMapper, RegionMapping, RegionReading, RawFieldRecordBuilder, LayoutRecordMapperTest
 
 ### Community 14 - "AI Document to Excel Backend"
 Cohesion: 0.22
@@ -142,8 +149,8 @@ Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
 ### Community 24 - "DocumentProcessingBenchmarkTest"
-Cohesion: 0.14
-Nodes (7): org.junit.jupiter.api.BeforeEach, org.springframework.test.web.servlet.MockMvc, AIServiceNotConfiguredException, ProcessedExcelFile, DocumentControllerTest, DocumentProcessingBenchmarkTest, MockMultipartFile
+Cohesion: 0.21
+Nodes (5): org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable, org.springframework.boot.test.context.SpringBootTest, AiDocApplicationTests, DocumentProcessingBenchmarkTest, MockMultipartFile
 
 ### Community 25 - ".sanitize"
 Cohesion: 0.23
@@ -154,28 +161,40 @@ Cohesion: 0.24
 Nodes (7): org.springframework.context.annotation.Bean, org.springframework.context.annotation.Configuration, org.springframework.web.servlet.config.annotation.CorsRegistry, org.springframework.web.servlet.config.annotation.WebMvcConfigurer, CorsConfiguration, Override, NvidiaApiConfiguration
 
 ### Community 27 - "DocumentProcessingService.java"
-Cohesion: 0.06
-Nodes (29): org.springframework.web.multipart.MultipartFile, PostMapping, RequestMapping, RestController, DocumentController, ExplainedField, ExplainedMapping, ProcessExplanation (+21 more)
+Cohesion: 0.07
+Nodes (23): org.springframework.web.multipart.MultipartFile, PostMapping, RequestMapping, RestController, DocumentController, ExplainedField, ExplainedMapping, ProcessExplanation (+15 more)
+
+### Community 47 - "org.springframework.stereotype.Component"
+Cohesion: 0.19
+Nodes (5): org.springframework.stereotype.Component, LayoutCell, LayoutRow, CellOrigin, RegionClassifier
+
+### Community 48 - "LayoutRegion"
+Cohesion: 0.26
+Nodes (4): java.util.regex.Pattern, ContinuationCandidate, LayoutRegion, RegionContinuationDetector
+
+### Community 52 - "LayoutAnalyzerTest.java"
+Cohesion: 0.24
+Nodes (5): RegionKind, KEY_VALUE, LIST, PROSE, TABLE
 
 ## Knowledge Gaps
-- **60 isolated node(s):** `com.example:ai-doc`, `TABLE`, `KEY_VALUE`, `LIST`, `PROSE` (+55 more)
+- **63 isolated node(s):** `com.example:ai-doc`, `FILL_THEN_APPEND`, `APPEND_ONLY`, `OVERWRITE`, `TABLE` (+58 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DocumentProcessingService` connect `DocumentProcessingService.java` to `DocumentProcessingException`, `ExcelService`, `ExcelColumn`, `Document`, `.process`, `DocumentElement`, `LayoutRecordMapper`, `DocumentProcessingBenchmarkTest`?**
-  _High betweenness centrality (0.058) - this node is a cross-community bridge._
-- **Why does `DocumentElement` connect `DocumentElement` to `DocumentProcessingService.java`, `DocumentProcessingException`, `ExcelColumn`, `org.junit.jupiter.api.Test`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `BBox` connect `DocumentElement` to `DocumentProcessingException`, `ExcelColumn`, `org.junit.jupiter.api.Test`, `.process`, `LayoutRecordMapper`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `DocumentProcessingService` connect `DocumentProcessingService.java` to `DocumentProcessingException`, `ExcelService`, `ExcelColumn`, `org.junit.jupiter.api.Test`, `DocumentElement`, `LayoutRecordMapper`, `DocumentProcessingBenchmarkTest`?**
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+- **Why does `DocumentElement` connect `DocumentElement` to `DocumentProcessingException`, `ExcelColumn`, `DocumentLayout`, `org.junit.jupiter.api.Test`, `LayoutRecordMapper`, `org.springframework.stereotype.Component`, `BBox`, `.analyze`, `LayoutAnalyzerTest.java`, `TableCellSplitter`, `DocumentProcessingService.java`?**
+  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `BBox` connect `BBox` to `DocumentProcessingException`, `ExcelColumn`, `DocumentLayout`, `org.junit.jupiter.api.Test`, `DocumentElement`, `LayoutRecordMapper`, `org.springframework.stereotype.Component`, `LayoutRegion`, `.analyze`, `LayoutAnalyzerTest.java`, `DocumentProcessingService.java`?**
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._
 - **Are the 11 inferred relationships involving `BBox` (e.g. with `.stack()` and `.toDocumentElement()`) actually correct?**
   _`BBox` has 11 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 4 inferred relationships involving `ExcelColumn` (e.g. with `.templateInfo()` and `.template()`) actually correct?**
   _`ExcelColumn` has 4 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `com.example:ai-doc`, `TABLE`, `KEY_VALUE` to the rest of the system?**
-  _60 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `com.example:ai-doc`, `FILL_THEN_APPEND`, `APPEND_ONLY` to the rest of the system?**
+  _63 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `DocumentProcessingException` be split into smaller, more focused modules?**
-  _Cohesion score 0.06739811912225706 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.066167290886392 - nodes in this community are weakly interconnected._

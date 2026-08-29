@@ -7,6 +7,7 @@ import com.example.ai_doc.api.dto.ExplainedField;
 import com.example.ai_doc.api.dto.ExplainedMapping;
 import com.example.ai_doc.api.dto.ProcessExplanation;
 import com.example.ai_doc.domain.excel.ExcelTemplateInfo;
+import com.example.ai_doc.domain.excel.ExcelWriteMode;
 import com.example.ai_doc.domain.layout.DocumentLayout;
 import com.example.ai_doc.domain.layout.ParsedDocument;
 import com.example.ai_doc.domain.mapping.DeterministicMappingResult;
@@ -80,6 +81,7 @@ public class DocumentProcessingService {
     private final HeaderInferenceService headerInferenceService;
     private final RawFieldRecordBuilder rawFieldRecordBuilder;
     private final NoTemplateMode noTemplateMode;
+    private final ExcelWriteMode excelWriteMode;
 
     @Autowired
     public DocumentProcessingService(DocumentFileValidator documentFileValidator,
@@ -94,7 +96,9 @@ public class DocumentProcessingService {
                                      HeaderInferenceService headerInferenceService,
                                      RawFieldRecordBuilder rawFieldRecordBuilder,
                                      @Value("${app.no-template.mode:INFERRED_HEADERS}")
-                                     NoTemplateMode noTemplateMode) {
+                                     NoTemplateMode noTemplateMode,
+                                     @Value("${app.excel.write-mode:FILL_THEN_APPEND}")
+                                     ExcelWriteMode excelWriteMode) {
         this.documentFileValidator = documentFileValidator;
         this.excelService = excelService;
         this.documentUnderstandingService = documentUnderstandingService;
@@ -107,6 +111,7 @@ public class DocumentProcessingService {
         this.headerInferenceService = headerInferenceService;
         this.rawFieldRecordBuilder = rawFieldRecordBuilder;
         this.noTemplateMode = noTemplateMode;
+        this.excelWriteMode = excelWriteMode;
     }
 
     /**
@@ -122,7 +127,8 @@ public class DocumentProcessingService {
                 headerFieldMapper, semanticMappingService, new PdfDocumentRenderer(),
                 defaultLayoutAnalyzer(), new LayoutRecordMapper(headerFieldMapper),
                 new ParsedDocumentFlattener(), new LayoutHeaderInferrer()::infer,
-                new RawFieldRecordBuilder(), NoTemplateMode.INFERRED_HEADERS);
+                new RawFieldRecordBuilder(), NoTemplateMode.INFERRED_HEADERS,
+                ExcelWriteMode.FILL_THEN_APPEND);
     }
 
     /** The layout stage has no configuration, so the legacy constructor can build its own. */
@@ -187,7 +193,8 @@ public class DocumentProcessingService {
             }
 
             start = System.nanoTime();
-            excelService.writeRows(workbook, templateInfo, templateInfo.dataRowIndex(), mapping.valueRows());
+            ExcelService.WriteOutcome outcome =
+                    excelService.writeRecords(workbook, templateInfo, mapping.valueRows(), writeModeFor(prepared));
             byte[] completedWorkbook = excelService.serialize(workbook);
             long excelWriteTime = elapsedMillis(start);
 
@@ -222,8 +229,7 @@ public class DocumentProcessingService {
                 throw new NoExcelMappingsException(mapping.describeEmptyOutcome());
             }
 
-            excelService.writeRows(workbook, templateInfo,
-                    templateInfo.dataRowIndex(), mapping.valueRows());
+            excelService.writeRecords(workbook, templateInfo, mapping.valueRows(), writeModeFor(prepared));
             byte[] completedWorkbook = excelService.serialize(workbook);
 
             return new ProcessExplanation(
@@ -430,7 +436,13 @@ public class DocumentProcessingService {
                     .orElse(0);
 
             List<BatchItemResult> results = new ArrayList<>(documents.size());
-            int rowIndex = templateInfo.dataRowIndex();
+            ExcelWriteMode mode = writeModeFor(prepared);
+
+            // Captured once, before the first document writes. Only rows the caller's own
+            // template already contained may be gap-filled; anything this batch adds is
+            // ours and must be appended past, not written into.
+            int gapFillBoundary = excelService.lastDataRow(
+                    workbook.getSheet(templateInfo.sheetName()), templateInfo);
 
             for (int documentIndex = 0; documentIndex < documents.size(); documentIndex++) {
                 MultipartFile document = documents.get(documentIndex);
@@ -448,16 +460,22 @@ public class DocumentProcessingService {
                         throw new NoExcelMappingsException(mapping.describeEmptyOutcome());
                     }
 
-                    // A document that yielded a table contributes several rows, so the next
-                    // document has to start below all of them rather than one row down.
-                    int written = excelService.writeRows(workbook, templateInfo, rowIndex, mapping.valueRows());
-                    results.add(new BatchItemResult(filename, true, rowIndex, null));
-                    rowIndex += written;
+                    // No running row counter: each write locates the sheet's current last
+                    // data row for itself, so a document contributing several rows - or
+                    // filling a gap above them - leaves the next document a correct start.
+                    ExcelService.WriteOutcome outcome = excelService.writeRecords(
+                            workbook, templateInfo, mapping.valueRows(), mode, gapFillBoundary);
+                    results.add(new BatchItemResult(
+                            filename, true, outcome.firstRowIndex(), outcome.rowsWritten(), null));
                 } catch (RuntimeException exception) {
-                    excelService.writeRow(workbook, templateInfo, rowIndex,
-                            Map.of(firstColumnIndex, "PROCESSING FAILED: " + exception.getMessage()));
-                    results.add(new BatchItemResult(filename, false, rowIndex, exception.getMessage()));
-                    rowIndex++;
+                    ExcelService.WriteOutcome failure = excelService.writeRecords(
+                            workbook, templateInfo,
+                            List.of(Map.of(firstColumnIndex, "PROCESSING FAILED: " + exception.getMessage())),
+                            mode == ExcelWriteMode.OVERWRITE ? ExcelWriteMode.OVERWRITE : ExcelWriteMode.APPEND_ONLY,
+                            gapFillBoundary);
+                    results.add(new BatchItemResult(
+                            filename, false, failure.firstRowIndex(), failure.rowsWritten(),
+                            exception.getMessage()));
                 }
             }
 
@@ -660,6 +678,16 @@ public class DocumentProcessingService {
                 excelService.createWorkbook(RawFieldRecordBuilder.HEADERS);
         return new PreparedWorkbook(
                 synthesized.workbook(), synthesized.templateInfo(), parsed, layout, true);
+    }
+
+    /**
+     * A workbook this run generated is empty by definition, so there is nothing to preserve
+     * and nothing to append after; writing from the first data row keeps its output compact.
+     * A template the caller supplied may hold their own data and is never overwritten
+     * unless they asked for that.
+     */
+    private ExcelWriteMode writeModeFor(PreparedWorkbook prepared) {
+        return prepared.headersWereInferred() ? ExcelWriteMode.OVERWRITE : excelWriteMode;
     }
 
     private DocumentMapping mapDocument(MultipartFile document, PreparedWorkbook prepared) {

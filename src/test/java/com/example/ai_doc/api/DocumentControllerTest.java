@@ -102,8 +102,8 @@ class DocumentControllerTest {
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1});
         given(documentProcessingService.processBatch(any(), any()))
                 .willReturn(new BatchProcessedExcelFile("completed-document.xlsx", new byte[]{4, 5, 6}, List.of(
-                        new BatchItemResult("scan1.pdf", true, 1, null),
-                        new BatchItemResult("scan2.pdf", false, 2, "Unsupported content type")
+                        new BatchItemResult("scan1.pdf", true, 1, 1, null),
+                        new BatchItemResult("scan2.pdf", false, 2, 1, "Unsupported content type")
                 )));
 
         mockMvc.perform(multipart("/api/documents/process/batch")

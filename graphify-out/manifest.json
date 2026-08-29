@@ -12,8 +12,8 @@
     "semantic_hash": "ab50dd89da7da2346b28003352eeeeeb"
   },
   "pom.xml": {
-    "mtime": 1787977193.3019094,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.903136,
+    "seen": 1787991861.164619,
     "ast_hash": "c5c35a87894a56992f606b949937c35c",
     "semantic_hash": ""
   },
@@ -108,669 +108,681 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/DocumentController.java": {
-    "mtime": 1787982253.870079,
-    "seen": 1787982421.098045,
-    "ast_hash": "071caad85c9544fc13c0212e968cf358",
+    "mtime": 1787982794.9044266,
+    "seen": 1787991861.164619,
+    "ast_hash": "107c7b910d9bf6ece0f40c18cdbf6de7",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/dto/ApiErrorResponse.java": {
-    "mtime": 1787978135.026057,
-    "seen": 1787980192.9499805,
-    "ast_hash": "bac4a6ad59fd666b605c572606cd98cf",
+    "mtime": 1787982794.9054277,
+    "seen": 1787991861.164619,
+    "ast_hash": "61b93f40da4d9d8b7e33899855d97e70",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/dto/ExplainedField.java": {
-    "mtime": 1787977001.826698,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9054277,
+    "seen": 1787991861.164619,
     "ast_hash": "07fc2d3c8cb67023029798ee54ac85d2",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/dto/ExplainedMapping.java": {
-    "mtime": 1787977001.8282022,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9064865,
+    "seen": 1787991861.164619,
     "ast_hash": "544c87635733e343560eb95b62969276",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/dto/ProcessExplanation.java": {
-    "mtime": 1787977001.8296938,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9064865,
+    "seen": 1787991861.164619,
     "ast_hash": "a7967cd67549cd0dbbeaf510c166ab03",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/dto/package-info.java": {
-    "mtime": 1787977344.198835,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9064865,
+    "seen": 1787991861.164619,
     "ast_hash": "a283df4c662f7dc05daa87c5c63eeeab",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/AIServiceNotConfiguredException.java": {
-    "mtime": 1787977001.8312037,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9076922,
+    "seen": 1787991861.164619,
     "ast_hash": "13a36c651b5fd6f5f16a431d2ea8daf2",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/DocumentProcessingException.java": {
-    "mtime": 1787977001.833791,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9076922,
+    "seen": 1787991861.164619,
     "ast_hash": "897eacdb9dffddda5b4c958461a79b3d",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/EmptyFileException.java": {
-    "mtime": 1787977001.8352764,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9092445,
+    "seen": 1787991861.164619,
     "ast_hash": "c883d97ae5af49ae52f1e15074bca412",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/ExternalAiServiceException.java": {
-    "mtime": 1787977001.8358088,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9092445,
+    "seen": 1787991861.164619,
     "ast_hash": "8ffec3fa66609e1c5b048d0c713fe429",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/FileSizeExceededException.java": {
-    "mtime": 1787977001.8371186,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9092445,
+    "seen": 1787991861.164619,
     "ast_hash": "943edbeeb1332954cb9eb41352861404",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/GlobalExceptionHandler.java": {
-    "mtime": 1787982253.8713987,
-    "seen": 1787982421.098045,
-    "ast_hash": "9abbda341bf270d731a7cbe784746931",
+    "mtime": 1787982794.9103925,
+    "seen": 1787991861.164619,
+    "ast_hash": "3131126c44a0c714317ea63081377b9a",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/InvalidExcelTemplateException.java": {
-    "mtime": 1787977001.843611,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9103925,
+    "seen": 1787991861.164619,
     "ast_hash": "565921d05c23b0e214d2ae3203c94ab0",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/InvalidFileTypeException.java": {
-    "mtime": 1787977001.844961,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9103925,
+    "seen": 1787991861.164619,
     "ast_hash": "7a6ce531ce91f57a29a4dc256c498ddf",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/NoExcelMappingsException.java": {
-    "mtime": 1787977001.8460228,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9118295,
+    "seen": 1787991861.164619,
     "ast_hash": "4cca077f2a1c2607749c948d9806d40c",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/UnsupportedDocumentUnderstandingException.java": {
-    "mtime": 1787977001.848539,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9118295,
+    "seen": 1787991861.164619,
     "ast_hash": "083683da3cf1065d20c84e46a2096d1f",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/package-info.java": {
-    "mtime": 1787977344.1998627,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9118295,
+    "seen": 1787991861.164619,
     "ast_hash": "0bb3a6d8006de7f864f6dc5265c0c795",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/package-info.java": {
-    "mtime": 1787977344.1964638,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9133291,
+    "seen": 1787991861.164619,
     "ast_hash": "04a4df53387d99ac634c5cc41d5af2dc",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/config/CorsConfiguration.java": {
-    "mtime": 1787978178.8995576,
-    "seen": 1787980192.9499805,
-    "ast_hash": "f22cc8632832ff6cf47fb81ca94284d9",
+    "mtime": 1787982794.9133291,
+    "seen": 1787991861.164619,
+    "ast_hash": "626c20fb9c77a1f2ae1ba5a6e4b8dc25",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/config/package-info.java": {
-    "mtime": 1787977344.201314,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9133291,
+    "seen": 1787991861.164619,
     "ast_hash": "dc443d0ba97096b73ea84a6c24a97e15",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/document/ExtractedDocumentData.java": {
-    "mtime": 1787977001.876935,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9146683,
+    "seen": 1787991861.164619,
     "ast_hash": "51d9b0882ba71e88e58ee44fdddcf9c2",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/document/ExtractedField.java": {
-    "mtime": 1787977001.8789546,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9160442,
+    "seen": 1787991861.164619,
     "ast_hash": "07cc7f10be045c800a1e0981bbbed79e",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/document/package-info.java": {
-    "mtime": 1787977344.2058156,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9160442,
+    "seen": 1787991861.164619,
     "ast_hash": "43d4b01a36d95d788632757cb84a80a6",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/excel/ExcelColumn.java": {
-    "mtime": 1787977001.8809545,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9170434,
+    "seen": 1787991861.164619,
     "ast_hash": "14ab49155eaca1c12db5d2dc893c6329",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/excel/ExcelTemplateInfo.java": {
-    "mtime": 1787977001.881959,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.918043,
+    "seen": 1787991861.164619,
     "ast_hash": "17cc971c6551d17775caaee0a23d48b0",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/excel/package-info.java": {
-    "mtime": 1787977344.2069786,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.918043,
+    "seen": 1787991861.164619,
     "ast_hash": "90bd8a32697f7d0a4a36ad564e49b439",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/BBox.java": {
-    "mtime": 1787977001.8861115,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9193654,
+    "seen": 1787991861.164619,
     "ast_hash": "8425d751a5849d30386addd65a45be42",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/ContinuationCandidate.java": {
-    "mtime": 1787977001.8886843,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9193654,
+    "seen": 1787991861.164619,
     "ast_hash": "79b07235b03896f52ff3fe831ad9702a",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/DocumentElement.java": {
-    "mtime": 1787977001.8906834,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9203646,
+    "seen": 1787991861.164619,
     "ast_hash": "cdaf5b509747b0c9c233c5c261cba843",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/DocumentLayout.java": {
-    "mtime": 1787977001.8927138,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9203646,
+    "seen": 1787991861.164619,
     "ast_hash": "277ae10bfa92e01cd208e60a8d0b6114",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/LayoutCell.java": {
-    "mtime": 1787977001.8948834,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9216418,
+    "seen": 1787991861.164619,
     "ast_hash": "1c374eb8cf3c711dd3a7ec94652b9d41",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/LayoutRegion.java": {
-    "mtime": 1787977001.8966813,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9216418,
+    "seen": 1787991861.164619,
     "ast_hash": "35f3866bee3f4214d17e4cc9a679321a",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/LayoutRow.java": {
-    "mtime": 1787977001.8976927,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9216418,
+    "seen": 1787991861.164619,
     "ast_hash": "31b7c59bfd3d001a1657126da310a30f",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/PageGeometry.java": {
-    "mtime": 1787977001.8996825,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9226418,
+    "seen": 1787991861.164619,
     "ast_hash": "de0bf95b96343b8e948423cfbebbb01b",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/ParsedDocument.java": {
-    "mtime": 1787977001.901317,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9226418,
+    "seen": 1787991861.164619,
     "ast_hash": "e9948efae26f266c2e07798524c11476",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/RegionKind.java": {
-    "mtime": 1787977001.9030507,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9226418,
+    "seen": 1787991861.164619,
     "ast_hash": "7520ccb7bd0a3e06409b1b373dc6222d",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/layout/package-info.java": {
-    "mtime": 1787977344.208306,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9241045,
+    "seen": 1787991861.164619,
     "ast_hash": "b64136987be25232e8dd9a868b609e6b",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/CellOrigin.java": {
-    "mtime": 1787977001.9071503,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9241045,
+    "seen": 1787991861.164619,
     "ast_hash": "745ae191a9abce45c97c185f173911c7",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/DeterministicMappingResult.java": {
-    "mtime": 1787982127.5941365,
-    "seen": 1787982421.098045,
-    "ast_hash": "7b5510ca8a5e09fc35ec65da9e648a7e",
+    "mtime": 1787982794.9255419,
+    "seen": 1787991861.164619,
+    "ast_hash": "c261796eac5439b51e60218f4e961607",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/IndexedExtractedField.java": {
-    "mtime": 1787977001.9097047,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9261603,
+    "seen": 1787991861.164619,
     "ast_hash": "fd1b0afbeaa8739b1bcf7b09a8bde3b5",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/MappedRecord.java": {
-    "mtime": 1787977001.9127605,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9261603,
+    "seen": 1787991861.164619,
     "ast_hash": "61f089f1c756b19461975d3dd2a2be59",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/MappingSource.java": {
-    "mtime": 1787977001.9137788,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9270384,
+    "seen": 1787991861.164619,
     "ast_hash": "552672e1dc636d4a151515e7e8783ec8",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/ResolvedFieldMapping.java": {
-    "mtime": 1787977001.915157,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9270384,
+    "seen": 1787991861.164619,
     "ast_hash": "d20fc24fb3491a9e9aa2ecb9275348c1",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/SemanticMapping.java": {
-    "mtime": 1787977001.9167233,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9280384,
+    "seen": 1787991861.164619,
     "ast_hash": "9cf0c0e35aa49055d01461f6d05bfdf0",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/SemanticMappingResponse.java": {
-    "mtime": 1787977001.9193394,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9280384,
+    "seen": 1787991861.164619,
     "ast_hash": "69af4fcebf02a414875daec8b331fb4e",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/mapping/package-info.java": {
-    "mtime": 1787977344.2093315,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.929038,
+    "seen": 1787991861.164619,
     "ast_hash": "8d89d427f0af630b997055fafb1e55b7",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/package-info.java": {
-    "mtime": 1787977344.203477,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.929038,
+    "seen": 1787991861.164619,
     "ast_hash": "b4bd92ea1124981ed1112cafa768b2e5",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/result/BatchItemResult.java": {
-    "mtime": 1787977001.920784,
-    "seen": 1787980192.9499805,
-    "ast_hash": "eb64d3e1775f2e80d179a51b23f9fb00",
+    "mtime": 1787991574.2359858,
+    "seen": 1787991861.164619,
+    "ast_hash": "5adbdd59dc7e46729c09393d9378b418",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/result/BatchProcessedExcelFile.java": {
-    "mtime": 1787977001.9219625,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9300377,
+    "seen": 1787991861.164619,
     "ast_hash": "89bcab1806a17c537e505d2e1e7c3eac",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/result/ProcessedExcelFile.java": {
-    "mtime": 1787977001.9234684,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9314382,
+    "seen": 1787991861.164619,
     "ast_hash": "40bb9957bc10a220cc5cc88f7d23958f",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/domain/result/package-info.java": {
-    "mtime": 1787977344.2109404,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9314382,
+    "seen": 1787991861.164619,
     "ast_hash": "4dcd504abf383f018bd65fedc692a353",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/persistence/Document.java": {
-    "mtime": 1787977001.9277766,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9324453,
+    "seen": 1787991861.164619,
     "ast_hash": "0e279f1480a13531f1abfe7a71692533",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/persistence/DocumentRepository.java": {
-    "mtime": 1787977001.9290953,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9324453,
+    "seen": 1787991861.164619,
     "ast_hash": "0f079e2ad513f6fdc9128a868e191204",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/persistence/package-info.java": {
-    "mtime": 1787977344.2132976,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9324453,
+    "seen": 1787991861.164619,
     "ast_hash": "5c5cebf087de7cc555b17c267d3254e4",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/DocumentProcessingService.java": {
-    "mtime": 1787982372.6775322,
-    "seen": 1787982421.098045,
-    "ast_hash": "3771c75f5cc12bc3d856e881683becb4",
+    "mtime": 1787991721.8860219,
+    "seen": 1787991861.164619,
+    "ast_hash": "e5ce1c8639cee7d9fa396d61192e5b62",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/document/DocumentService.java": {
-    "mtime": 1787982253.884506,
-    "seen": 1787982421.098045,
-    "ast_hash": "cea61d1f5a08b5a41805f1a1ac6284a2",
+    "mtime": 1787982794.9349291,
+    "seen": 1787991861.164619,
+    "ast_hash": "1b752cbc7b2abba28eb55c4fcdd45192",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/document/StoredFilename.java": {
-    "mtime": 1787978031.0197017,
-    "seen": 1787980192.9499805,
-    "ast_hash": "6ea9869fef6a9c9989ec88fcf8e1613b",
+    "mtime": 1787982794.9349291,
+    "seen": 1787991861.164619,
+    "ast_hash": "92294b6d196cc4a0006d671a98aae642",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/document/package-info.java": {
-    "mtime": 1787977344.2157176,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9359286,
+    "seen": 1787991861.164619,
     "ast_hash": "8860b5fe4ee2a4de9906121fe0dab776",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/excel/ExcelService.java": {
-    "mtime": 1787977001.9636848,
-    "seen": 1787980192.9499805,
-    "ast_hash": "b7159547b89b44a975db3a68e9774bc4",
+    "mtime": 1787991721.8850145,
+    "seen": 1787991861.164619,
+    "ast_hash": "493808a110adaef434dea86c05143cc2",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/excel/package-info.java": {
-    "mtime": 1787977344.2171805,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.936929,
+    "seen": 1787991861.164619,
     "ast_hash": "aa27325e448f95ec672afe578d0d8816",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/ColumnClusterer.java": {
-    "mtime": 1787977001.971114,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9379292,
+    "seen": 1787991861.164619,
     "ast_hash": "45204cef11f2c8896f9f4d1f793cbf2b",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/ColumnGutterDetector.java": {
-    "mtime": 1787977001.976751,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.938929,
+    "seen": 1787991861.164619,
     "ast_hash": "340339bba78edccbb0f0df39fa96f978",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/Geometry.java": {
-    "mtime": 1787977001.9797604,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.938929,
+    "seen": 1787991861.164619,
     "ast_hash": "830ab74c6ef4c91a8d3959ce8fa067bd",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/LayoutAnalyzer.java": {
-    "mtime": 1787982372.716859,
-    "seen": 1787982421.098045,
-    "ast_hash": "b94e634e023a91a8ca07558d9fe4f0d9",
+    "mtime": 1787982794.9399295,
+    "seen": 1787991861.164619,
+    "ast_hash": "47f81a3709f3162db84d0bc54cd08549",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/RegionClassifier.java": {
-    "mtime": 1787982316.8064413,
-    "seen": 1787982421.098045,
-    "ast_hash": "909183877ec432242e45adef1dd6f59e",
+    "mtime": 1787982794.9399295,
+    "seen": 1787991861.164619,
+    "ast_hash": "079db34768d436123e07ba62309ed16c",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/RegionContinuationDetector.java": {
-    "mtime": 1787977002.0035594,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9409287,
+    "seen": 1787991861.164619,
     "ast_hash": "251c4b7b2f84172650e7d778bef5c110",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/RowBander.java": {
-    "mtime": 1787977002.0068495,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9409287,
+    "seen": 1787991861.164619,
     "ast_hash": "9ce0fd83637edb03269c498a42bad38c",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/VerticalSlabSplitter.java": {
-    "mtime": 1787977002.010877,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9409287,
+    "seen": 1787991861.164619,
     "ast_hash": "b86202dd14af489c806e07c0f500800d",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/layout/package-info.java": {
-    "mtime": 1787977344.218739,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.942422,
+    "seen": 1787991861.164619,
     "ast_hash": "bf85379c9d95f7e78c4e4d971fb45ca4",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/HeaderAliases.java": {
-    "mtime": 1787977464.1578295,
-    "seen": 1787980192.9499805,
-    "ast_hash": "66adf49cd85c4c3ecb4bba36ec5b00bb",
+    "mtime": 1787982794.942422,
+    "seen": 1787991861.164619,
+    "ast_hash": "6056ec5ad27286a16310c1cda0e6b0e1",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/HeaderFieldMapper.java": {
-    "mtime": 1787982127.5234184,
-    "seen": 1787982421.098045,
-    "ast_hash": "fb2294ab02a62f59d7ff901aa4e54b7e",
+    "mtime": 1787982794.943835,
+    "seen": 1787991861.164619,
+    "ast_hash": "044afa4ab889ba14ac0bdc0ddbdf3114",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/HeaderInferenceService.java": {
-    "mtime": 1787977002.018362,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.943835,
+    "seen": 1787991861.164619,
     "ast_hash": "3de134a2c67b49cf0effb5cefa24f2c6",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/HeaderNameNormalizer.java": {
-    "mtime": 1787982127.5585124,
-    "seen": 1787982421.098045,
-    "ast_hash": "ff7d6acd590bb871631c6e9d87ad6b9d",
+    "mtime": 1787982794.9448395,
+    "seen": 1787991861.164619,
+    "ast_hash": "2d46efc0dde7401c193a21830a00f5ab",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/LayoutHeaderInferrer.java": {
-    "mtime": 1787977002.0256631,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9448395,
+    "seen": 1787991861.164619,
     "ast_hash": "fc21d006ceb5df25c1996733fa30a8e9",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/LayoutRecordMapper.java": {
-    "mtime": 1787982316.770659,
-    "seen": 1787982421.098045,
-    "ast_hash": "9df5d29305ef907e7eab7df92e1e280c",
+    "mtime": 1787982794.945839,
+    "seen": 1787991861.164619,
+    "ast_hash": "99df10797b74756a2fa55fabd320c9df",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/NemotronHeaderInferenceService.java": {
-    "mtime": 1787977002.0465293,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.945839,
+    "seen": 1787991861.164619,
     "ast_hash": "a263c028c073ac631c12ebf6595b192d",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/NemotronSemanticMappingService.java": {
-    "mtime": 1787982316.7359512,
-    "seen": 1787982421.098045,
-    "ast_hash": "0a830460b33734d01e5f2319f97cde1d",
+    "mtime": 1787982794.946839,
+    "seen": 1787991861.164619,
+    "ast_hash": "bbf08ec24eeee3d93a879cb372e2e0ee",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/RawFieldRecordBuilder.java": {
-    "mtime": 1787979740.796908,
-    "seen": 1787980192.9499805,
-    "ast_hash": "eb5dac207f7761be563df1d77831d05a",
+    "mtime": 1787982794.9478388,
+    "seen": 1787991861.164619,
+    "ast_hash": "bc87986cfee609e2b6e1782129b7285e",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/SemanticMappingService.java": {
-    "mtime": 1787977002.0674834,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9478388,
+    "seen": 1787991861.164619,
     "ast_hash": "64f428f0255158c3cd602f092ecd97fe",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/package-info.java": {
-    "mtime": 1787977344.2200181,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9478388,
+    "seen": 1787991861.164619,
     "ast_hash": "acf7a204d39c5fe6b2300787f4f13cea",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/nvidia/ModelJsonResponses.java": {
-    "mtime": 1787977002.0715907,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9493432,
+    "seen": 1787991861.164619,
     "ast_hash": "c3c06da738e1696736ea349463392996",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/nvidia/NvidiaChatCompletionClient.java": {
-    "mtime": 1787977002.073796,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9493432,
+    "seen": 1787991861.164619,
     "ast_hash": "870a8cc59992ea6abf919d51839c01e0",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/nvidia/package-info.java": {
-    "mtime": 1787977344.2214844,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9508376,
+    "seen": 1787991861.164619,
     "ast_hash": "fe1bef87624c8291c7be9a47b98124db",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/package-info.java": {
-    "mtime": 1787977344.2143607,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9508376,
+    "seen": 1787991861.164619,
     "ast_hash": "ca2d62e66db67d642a207660d1c3832a",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/DocumentPageImage.java": {
-    "mtime": 1787977002.0760803,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9518385,
+    "seen": 1787991861.164619,
     "ast_hash": "4d5581a232a0003caba097d4f198a689",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/DocumentUnderstandingService.java": {
-    "mtime": 1787977002.081077,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9518385,
+    "seen": 1787991861.164619,
     "ast_hash": "9c0ff2d8bcdea02bf2d9d7d710daab76",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/NemotronDocumentUnderstandingService.java": {
-    "mtime": 1787977002.0920632,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.952838,
+    "seen": 1787991861.164619,
     "ast_hash": "6f131cce4c59a75671ccb9ecf3613e25",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/ParsedDocumentFlattener.java": {
-    "mtime": 1787977002.0947635,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.953838,
+    "seen": 1787991861.164619,
     "ast_hash": "d107fcb8cee57faebc57db0408070ce2",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/PdfDocumentRenderer.java": {
-    "mtime": 1787977002.0982919,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.953838,
+    "seen": 1787991861.164619,
     "ast_hash": "8f2a3d0220f47b6ce334e1d7f0cf1ec1",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/TableCellSplitter.java": {
-    "mtime": 1787977002.1028023,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9548392,
+    "seen": 1787991861.164619,
     "ast_hash": "9aea379bc47b46e5c56606977baf6445",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/understanding/package-info.java": {
-    "mtime": 1787977344.2226813,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9548392,
+    "seen": 1787991861.164619,
     "ast_hash": "039f4d6fc9ca314e336c069a831c0e58",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/validation/DocumentFileValidator.java": {
-    "mtime": 1787982253.8863895,
-    "seen": 1787982421.098045,
-    "ast_hash": "c12843ff8fb616fdfab36effd57f0392",
+    "mtime": 1787982794.9558387,
+    "seen": 1787991861.164619,
+    "ast_hash": "e55f0ab4f4a41de8ba531eca16466d3a",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/validation/ExcelTemplateValidator.java": {
-    "mtime": 1787982253.9004724,
-    "seen": 1787982421.098045,
-    "ast_hash": "14e75364573b81b4ead11fcc22ae6fb7",
+    "mtime": 1787982794.9568384,
+    "seen": 1787991861.164619,
+    "ast_hash": "7c557b6b1ee7b780087f41fb4b8e1d05",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/validation/package-info.java": {
-    "mtime": 1787977344.2245877,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9568384,
+    "seen": 1787991861.164619,
     "ast_hash": "ef8feed2a67ebff41e60972b273691c9",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/TestFiles.java": {
-    "mtime": 1787978280.1348715,
-    "seen": 1787980192.9499805,
-    "ast_hash": "8b1ff45899a051448f6f0dd68dd092de",
+    "mtime": 1787982794.9588425,
+    "seen": 1787991861.164619,
+    "ast_hash": "f6a3b953b795b2f0c290e4f8ccc3e86f",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/api/DocumentControllerTest.java": {
-    "mtime": 1787982253.914042,
-    "seen": 1787982421.098045,
-    "ast_hash": "c3bb71cf848b71593d1a319926d44623",
+    "mtime": 1787991628.612268,
+    "seen": 1787991861.164619,
+    "ast_hash": "a89cf6e8fb59f94ea37318abe8b6a271",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/benchmark/DocumentProcessingBenchmarkTest.java": {
-    "mtime": 1787981808.9247706,
-    "seen": 1787982421.098045,
-    "ast_hash": "65162ac80142b3dbd742634b3067314b",
+    "mtime": 1787982794.9598432,
+    "seen": 1787991861.164619,
+    "ast_hash": "8edfc266b091f77ac73ebdbbcb4ac349",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/benchmark/PipelineMicroBenchmark.java": {
-    "mtime": 1787981808.9615889,
-    "seen": 1787982421.098045,
-    "ast_hash": "6b6300ee5ae302637c61f3abd216b184",
+    "mtime": 1787982794.960853,
+    "seen": 1787991861.164619,
+    "ast_hash": "d72a7a452f5abf0330f71377d3759a44",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/DocumentProcessingMultiRowTest.java": {
-    "mtime": 1787982372.7411766,
-    "seen": 1787982421.098045,
-    "ast_hash": "9676fcd0f7ed78888311cf798e0a8466",
+    "mtime": 1787991811.3925245,
+    "seen": 1787991861.164619,
+    "ast_hash": "bad046f466154019d68868dbdc56c69d",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/DocumentProcessingServiceTest.java": {
-    "mtime": 1787982253.9339104,
-    "seen": 1787982421.098045,
-    "ast_hash": "11dd0dafa65914e1e385d345d428b99a",
+    "mtime": 1787982794.9618533,
+    "seen": 1787991861.164619,
+    "ast_hash": "fe820941833a065b7d0acdacd173de76",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/document/StoredFilenameTest.java": {
-    "mtime": 1787978429.8255875,
-    "seen": 1787980192.9499805,
-    "ast_hash": "840e3b75839b2497b573be32b103655a",
+    "mtime": 1787982794.9628541,
+    "seen": 1787991861.164619,
+    "ast_hash": "5a52e99dd7b1fb3f14b69aeb18d998d4",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/excel/ExcelServiceTest.java": {
-    "mtime": 1787977002.1282678,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.963852,
+    "seen": 1787991861.164619,
     "ast_hash": "e0057c7026d700414d7bc264ae2a7c84",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/layout/LayoutAnalyzerTest.java": {
-    "mtime": 1787977002.1387835,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9648478,
+    "seen": 1787991861.164619,
     "ast_hash": "c11ae30aa0226857c76ac42420ff680b",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/mapping/DeterministicMappingTest.java": {
-    "mtime": 1787977577.1450405,
-    "seen": 1787980192.9499805,
-    "ast_hash": "352adc33ed6bb0ef5d510488fb1ef52d",
+    "mtime": 1787982794.9658492,
+    "seen": 1787991861.164619,
+    "ast_hash": "fb6b5e9bc352184193a0594daa752d62",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/mapping/HeaderFieldMapperTest.java": {
-    "mtime": 1787977002.1428177,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9658492,
+    "seen": 1787991861.164619,
     "ast_hash": "036e92f67dfe4a8d0fef2ca2649dddaa",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/mapping/LayoutHeaderInferrerTest.java": {
-    "mtime": 1787977002.1482656,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9668484,
+    "seen": 1787991861.164619,
     "ast_hash": "5f49cabf08e1d4727bc00a9a9b6c27f6",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/mapping/LayoutRecordMapperTest.java": {
-    "mtime": 1787982316.8420217,
-    "seen": 1787982421.098045,
-    "ast_hash": "5f1f39d90532eb30200e3e4beec30c55",
+    "mtime": 1787982794.9668484,
+    "seen": 1787991861.164619,
+    "ast_hash": "05cc034adc592f0835e62517f1f41741",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/mapping/NemotronSemanticMappingServiceTest.java": {
-    "mtime": 1787977002.1646638,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.967989,
+    "seen": 1787991861.164619,
     "ast_hash": "aa8defbb4017e92408d9f1881ac93688",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/mapping/SemanticMappingValidationTest.java": {
-    "mtime": 1787977951.6509387,
-    "seen": 1787980192.9499805,
-    "ast_hash": "28dd7e5bc1a82834063327f958fd1b21",
+    "mtime": 1787982794.967989,
+    "seen": 1787991861.164619,
+    "ast_hash": "1e544c48db2beffe9502109a85ad41b5",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/validation/DocumentFileValidatorTest.java": {
-    "mtime": 1787982253.9241178,
-    "seen": 1787982421.098045,
-    "ast_hash": "1c03933e42b287ad3230136d25e49f79",
+    "mtime": 1787982794.9689896,
+    "seen": 1787991861.164619,
+    "ast_hash": "57ed25bf8ec1d310d8fc34c4212f339c",
     "semantic_hash": ""
   },
   "src/test/resources/benchmark/ai_doc_test_document.pdf": {
-    "mtime": 1787241834.425483,
-    "seen": 1787980192.9499805,
+    "mtime": 1787982794.9699924,
+    "seen": 1787991861.164619,
     "ast_hash": "97817e0436d15709c8527349179f2d7e",
+    "semantic_hash": ""
+  },
+  "src/main/java/com/example/ai_doc/domain/excel/ExcelWriteMode.java": {
+    "mtime": 1787991472.8617806,
+    "seen": 1787991861.164619,
+    "ast_hash": "99726380427ab3165c00e5567cb4d486",
+    "semantic_hash": ""
+  },
+  "src/test/java/com/example/ai_doc/pipeline/excel/ExcelWriteModeTest.java": {
+    "mtime": 1787991781.8212607,
+    "seen": 1787991861.164619,
+    "ast_hash": "bb7d5b1f76313e612cf8ba88a58fca38",
     "semantic_hash": ""
   }
 }
