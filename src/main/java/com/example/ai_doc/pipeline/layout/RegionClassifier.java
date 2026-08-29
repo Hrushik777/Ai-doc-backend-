@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 @Component
 public class RegionClassifier {
 
-    private static final Pattern LEADING_BULLET = Pattern.compile("^\\s*[-*â€¢Â·]\\s+");
+    private static final Pattern LEADING_BULLET = Pattern.compile("^\\s*[-*•·]\\s+");
     private static final Pattern LEADING_NUMBER = Pattern.compile("^\\s*\\d+\\s*[.):\\-]");
     private static final Pattern LEADING_LETTER = Pattern.compile("^\\s*[a-zA-Z]\\s*[.)]\\s+");
 

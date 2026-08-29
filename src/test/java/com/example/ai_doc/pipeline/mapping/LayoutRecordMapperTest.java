@@ -121,6 +121,49 @@ class LayoutRecordMapperTest {
         assertThat(records.get(2).values()).containsEntry(3, "90 psi");
     }
 
+    /**
+     * A table continued onto page 2 repeats its rows but not its header band. Before the
+     * band was carried forward, page 2 matched no headers and contributed nothing - a
+     * multi-page table silently lost every row after the first page.
+     */
+    @Test
+    void aTableContinuedOntoASecondPageKeepsItsRows() {
+        List<DocumentElement> elements = new ArrayList<>(equipmentTable(100));
+        elements.addAll(continuationPage(new String[][]{
+                {"P-201", "Screw Pump", "70 psi"},
+                {"V-301", "Separator", "60 psi"}}));
+
+        List<MappedRecord> records = mapper.mapLayout(
+                template("Tag", "Type", "Pressure"),
+                analyzer.analyze(elements, List.of(PAGE, new PageGeometry(2, 1000, 1000))));
+
+        assertThat(records).hasSize(5);
+        assertThat(records).extracting(record -> record.values().get(0))
+                .containsExactly("P-101", "P-102", "V-201", "P-201", "V-301");
+    }
+
+    /** An unrelated grid further down must not inherit a previous table's header band. */
+    @Test
+    void aLaterGridWithADifferentShapeDoesNotInheritTheHeaderBand() {
+        List<DocumentElement> elements = new ArrayList<>(equipmentTable(100));
+        // Two columns on page 2, where the table above had three.
+        for (int rowIndex = 0; rowIndex < 3; rowIndex++) {
+            double y = 100 + rowIndex * 40;
+            elements.add(new DocumentElement(2, "note " + rowIndex, "text",
+                    new BBox(100, y, 200, y + 18)));
+            elements.add(new DocumentElement(2, "value " + rowIndex, "text",
+                    new BBox(500, y, 600, y + 18)));
+        }
+
+        List<MappedRecord> records = mapper.mapLayout(
+                template("Tag", "Type", "Pressure"),
+                analyzer.analyze(elements, List.of(PAGE, new PageGeometry(2, 1000, 1000))));
+
+        assertThat(records).hasSize(3);
+        assertThat(records).extracting(record -> record.values().get(0))
+                .containsExactly("P-101", "P-102", "V-201");
+    }
+
     @Test
     void anEmptyLayoutMapsToNoRecords() {
         assertThat(mapper.mapLayout(template("Tag"), DocumentLayout.empty())).isEmpty();
@@ -166,6 +209,21 @@ class LayoutRecordMapperTest {
                 double x = columnStarts[column];
                 elements.add(element(rows[rowIndex][column], x, y,
                         x + rows[rowIndex][column].length() * 8.0, y + 18));
+            }
+        }
+        return elements;
+    }
+
+    /** Rows of the same table on page 2, with no header band of their own. */
+    private List<DocumentElement> continuationPage(String[][] rows) {
+        double[] columnStarts = {100, 300, 500};
+        List<DocumentElement> elements = new ArrayList<>();
+        for (int rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            double y = 100 + rowIndex * 40;
+            for (int column = 0; column < rows[rowIndex].length; column++) {
+                double x = columnStarts[column];
+                elements.add(new DocumentElement(2, rows[rowIndex][column], "text",
+                        new BBox(x, y, x + rows[rowIndex][column].length() * 8.0, y + 18)));
             }
         }
         return elements;

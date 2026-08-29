@@ -51,7 +51,7 @@ public class LayoutRecordMapper {
      * Separators that join several values into one cell, as {@code 1 - 3.5} does. Ordered
      * from most to least explicit so a value containing both is split on the stronger one.
      */
-    private static final String[] COMPOSITE_SEPARATORS = {" - ", " â€“ ", " â€” ", " = ", "\t", ": "};
+    private static final String[] COMPOSITE_SEPARATORS = {" - ", " – ", " — ", " = ", "\t", ": "};
 
     /** A named header match is worth far more than any amount of positional guessing. */
     private static final int HEADER_MATCH_WEIGHT = 1000;
@@ -87,16 +87,39 @@ public class LayoutRecordMapper {
         List<MappedRecord> tabularRecords = new ArrayList<>();
         Map<Integer, String> documentLevelValues = new LinkedHashMap<>();
 
+        // A table continued onto the next page repeats its rows but not its header band, so
+        // the mapping established on the first page is carried forward. Without this the
+        // continuation resolves nothing, and a multi-page table silently loses every row
+        // after the first page.
+        CarriedHeaderBand carried = null;
+
         for (int index = 0; index < layout.regions().size(); index++) {
             LayoutRegion region = layout.regions().get(index);
 
             switch (region.kind()) {
-                case TABLE, LIST -> tabularRecords.addAll(
-                        bestReading(layout, index, templateInfo, columnsByHeader).records());
+                case TABLE, LIST -> {
+                    RegionReading reading =
+                            bestReading(layout, index, templateInfo, columnsByHeader, carried);
+                    tabularRecords.addAll(reading.mapping().records());
+                    if (reading.headerBand() != null) {
+                        carried = reading.headerBand();
+                    }
+                }
                 case KEY_VALUE -> documentLevelValues.putAll(mapKeyValueRegion(region, columnsByHeader));
                 default -> {
-                    // Prose carries no structure worth mapping positionally; the semantic
-                    // stage still sees it through the flat field path.
+                    // Prose carries no structure worth mapping positionally, and the semantic
+                    // stage still sees it through the flat field path. One exception: the tail
+                    // of a table continued across a page break has no header band of its own,
+                    // and a short one classifies as prose for exactly that reason. A carried
+                    // band of the same shape is enough evidence to map it - and it is the only
+                    // evidence that would be, which is why nothing else here is mapped.
+                    if (carried != null && carried.appliesTo(region)) {
+                        LOGGER.debug("Unclassified region on page {} mapped as the continuation"
+                                + " of the table whose header band was on page {}",
+                                region.page(), carried.page());
+                        tabularRecords.addAll(
+                                mapRows(region, carried.columns(), 0, carried.columns().size()).records());
+                    }
                 }
             }
         }
@@ -109,23 +132,26 @@ public class LayoutRecordMapper {
      * and keeps whichever the template supports better. A tie keeps the page layout - the
      * arrangement actually printed - rather than guessing.
      */
-    private RegionMapping bestReading(DocumentLayout layout,
+    private RegionReading bestReading(DocumentLayout layout,
                                       int regionIndex,
                                       ExcelTemplateInfo templateInfo,
-                                      Map<String, List<ExcelColumn>> columnsByHeader) {
+                                      Map<String, List<ExcelColumn>> columnsByHeader,
+                                      CarriedHeaderBand carried) {
 
         LayoutRegion region = layout.regions().get(regionIndex);
-        RegionMapping best = mapRegion(region, templateInfo, columnsByHeader);
+        RegionReading best = mapRegion(region, templateInfo, columnsByHeader, carried);
 
         for (ContinuationCandidate candidate : layout.continuations()) {
             if (!candidate.regionIndexes().equals(List.of(regionIndex))) {
                 continue;
             }
 
-            RegionMapping merged = mapRegion(candidate.mergedReading(), templateInfo, columnsByHeader);
-            if (merged.score() > best.score()) {
+            RegionReading merged =
+                    mapRegion(candidate.mergedReading(), templateInfo, columnsByHeader, carried);
+            if (merged.mapping().score() > best.mapping().score()) {
                 LOGGER.debug("Region {} read as a continued list ({}): {} rows instead of {}",
-                        regionIndex, candidate.evidence(), merged.records().size(), best.records().size());
+                        regionIndex, candidate.evidence(),
+                        merged.mapping().records().size(), best.mapping().records().size());
                 best = merged;
             }
         }
@@ -133,11 +159,47 @@ public class LayoutRecordMapper {
         return best;
     }
 
-    private RegionMapping mapRegion(LayoutRegion region,
+    /**
+     * Three tiers, strongest first: the region's own header band, a header band carried over
+     * from an earlier page, then blind positional mapping.
+     */
+    private RegionReading mapRegion(LayoutRegion region,
                                     ExcelTemplateInfo templateInfo,
-                                    Map<String, List<ExcelColumn>> columnsByHeader) {
-        RegionMapping byHeaderBand = mapByHeaderBand(region, columnsByHeader);
-        return byHeaderBand.score() > 0 ? byHeaderBand : mapPositionally(region, templateInfo);
+                                    Map<String, List<ExcelColumn>> columnsByHeader,
+                                    CarriedHeaderBand carried) {
+
+        Map<Integer, List<ExcelColumn>> ownBand = headerBandOf(region, columnsByHeader);
+        if (ownBand.size() >= MIN_HEADER_MATCHES) {
+            return new RegionReading(
+                    mapRows(region, ownBand, 1, ownBand.size()),
+                    new CarriedHeaderBand(ownBand, region.columnCount(), region.page()));
+        }
+
+        if (carried != null && carried.appliesTo(region)) {
+            // Every row is data here: the header stayed behind on the previous page.
+            LOGGER.debug("Region on page {} continues a table whose header band was on page {}",
+                    region.page(), carried.page());
+            return new RegionReading(
+                    mapRows(region, carried.columns(), 0, carried.columns().size()), null);
+        }
+
+        return new RegionReading(mapPositionally(region, templateInfo), null);
+    }
+
+    /** A region mapping, plus the header band it established for later pages to reuse. */
+    private record RegionReading(RegionMapping mapping, CarriedHeaderBand headerBand) {
+    }
+
+    /**
+     * A header band established on one page, available to the same table's continuation on
+     * the next. Deliberately narrow - it applies only to a later page whose column count
+     * matches - so an unrelated grid further down the document cannot inherit it.
+     */
+    private record CarriedHeaderBand(Map<Integer, List<ExcelColumn>> columns, int columnCount, int page) {
+
+        boolean appliesTo(LayoutRegion region) {
+            return region.page() > page && region.columnCount() == columnCount;
+        }
     }
 
     /**
@@ -145,28 +207,30 @@ public class LayoutRecordMapper {
      * line up, maps every following row positionally. This is the path that turns a
      * twenty-row table into twenty spreadsheet rows without a single model call.
      */
-    private RegionMapping mapByHeaderBand(LayoutRegion region,
-                                          Map<String, List<ExcelColumn>> columnsByHeader) {
-        if (region.rows().size() < 2) {
-            return RegionMapping.none();
-        }
+    private Map<Integer, List<ExcelColumn>> headerBandOf(
+            LayoutRegion region, Map<String, List<ExcelColumn>> columnsByHeader) {
 
         Map<Integer, List<ExcelColumn>> templateColumnsByRegionColumn = new LinkedHashMap<>();
+        if (region.rows().size() < 2) {
+            return templateColumnsByRegionColumn;
+        }
         for (LayoutCell cell : region.rows().get(0).cells()) {
             List<ExcelColumn> matching = columnsByHeader.get(headerFieldMapper.matchKey(cell.text()));
             if (matching != null) {
                 templateColumnsByRegionColumn.put(cell.columnIndex(), matching);
             }
         }
+        return templateColumnsByRegionColumn;
+    }
 
-        int headerMatches = templateColumnsByRegionColumn.size();
-        if (headerMatches < MIN_HEADER_MATCHES) {
-            return RegionMapping.none();
-        }
+    private RegionMapping mapRows(LayoutRegion region,
+                                  Map<Integer, List<ExcelColumn>> templateColumnsByRegionColumn,
+                                  int firstDataRow,
+                                  int headerMatches) {
 
-        List<MappedRecord> records = new ArrayList<>(region.rows().size() - 1);
+        List<MappedRecord> records = new ArrayList<>(region.rows().size());
 
-        for (int rowIndex = 1; rowIndex < region.rows().size(); rowIndex++) {
+        for (int rowIndex = firstDataRow; rowIndex < region.rows().size(); rowIndex++) {
             Map<Integer, String> values = new LinkedHashMap<>();
             Map<Integer, CellOrigin> origins = new LinkedHashMap<>();
 

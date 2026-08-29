@@ -20,9 +20,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /** Uses NVIDIA's reasoning model only after deterministic header matching has failed. */
 @Service
@@ -193,6 +197,10 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
 
     private static final int MAX_MAPPING_ATTEMPTS = 2;
 
+    private static final String FIELD_ID_PREFIX = "field-";
+
+    private static final Pattern WHITESPACE_RUN = Pattern.compile("\s+");
+
     private static final String TRUNCATED_RESPONSE_MESSAGE =
             "Semantic mapping model ran out of output tokens before completing its JSON object"
                     + " - raise nvidia.mapping.max-tokens, or use a mapping model that does not"
@@ -266,7 +274,7 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
             throw lastFailure;
         }
 
-        return validateMappings(mappingResponse.mappings(), headers).stream()
+        return validateMappings(mappingResponse.mappings(), headers, unmatchedFields).stream()
                 .filter(mapping -> mapping.confidence() >= confidenceThreshold)
                 .toList();
     }
@@ -428,13 +436,32 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         }
     }
 
+    /**
+     * Keeps only the mappings that can be proven against what was actually sent.
+     *
+     * <p>Nothing here trusts the prompt. The prompt tells the model not to invent values,
+     * not to copy one field's value onto another, and not to treat a header mentioned in
+     * prose as data - but a prompt is a request, not a guarantee, and the workbook is what
+     * the user gets. Every mapping therefore has to name a field that was supplied and
+     * carry a value that actually occurs in that field's text.
+     *
+     * <p>An invalid mapping is dropped, not fatal. Failing the batch over one bad entry
+     * throws away the good ones alongside it, which is a worse outcome than a workbook with
+     * one column left for a human to fill.
+     */
     private List<SemanticMapping> validateMappings(
             List<SemanticMapping> mappings,
-            List<ExcelColumn> headers) {
+            List<ExcelColumn> headers,
+            List<IndexedExtractedField> suppliedFields) {
 
         Set<Integer> offeredColumnIndexes = new HashSet<>(headers.size());
         for (ExcelColumn header : headers) {
             offeredColumnIndexes.add(header.columnIndex());
+        }
+
+        Map<Integer, ExtractedField> fieldsByIndex = new HashMap<>(suppliedFields.size());
+        for (IndexedExtractedField supplied : suppliedFields) {
+            fieldsByIndex.put(supplied.fieldIndex(), supplied.field());
         }
 
         Set<String> seenFieldIds = new HashSet<>();
@@ -442,26 +469,13 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
 
         for (SemanticMapping mapping : mappings) {
 
-            // A malformed mapping means the model ignored the response contract, so the
-            // document still fails loudly rather than silently losing data.
-            if (mapping.fieldId() == null
-                    || mapping.fieldId().isBlank()
-                    || mapping.name() == null
-                    || mapping.name().isBlank()
-                    || mapping.value() == null
-                    || mapping.value().isBlank()
-                    || !Double.isFinite(mapping.confidence())
-                    || mapping.confidence() < 0
-                    || mapping.confidence() > 1) {
-
-                throw new DocumentProcessingException(
-                        "Semantic mapping model returned an invalid mapping");
+            if (isMalformed(mapping)) {
+                LOGGER.warn("Discarding a malformed semantic mapping for column {}",
+                        mapping == null ? "?" : mapping.columnIndex());
+                continue;
             }
 
-            // A repeated fieldId used to fail the whole document. It is no longer a contract
-            // violation: one source element can legitimately supply values for several rows,
-            // and the structural stage now produces exactly that. Only the first mapping for
-            // a field can win the column anyway, so a repeat is dropped rather than fatal.
+            // One source field may not be spent twice; only the first can win a column.
             if (!seenFieldIds.add(mapping.fieldId())) {
                 LOGGER.debug("Discarding a repeated mapping for source field {}", mapping.fieldId());
                 continue;
@@ -471,8 +485,22 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
             // deliberately withheld is well-formed but unusable - the deterministic value for
             // that column wins regardless - so it is dropped instead of failing the document.
             if (!offeredColumnIndexes.contains(mapping.columnIndex())) {
-                LOGGER.debug("Discarding semantic mapping for column {} which was not offered to the model",
+                LOGGER.debug("Discarding semantic mapping for column {} which was not offered",
                         mapping.columnIndex());
+                continue;
+            }
+
+            ExtractedField source = sourceFieldFor(mapping.fieldId(), fieldsByIndex);
+            if (source == null) {
+                LOGGER.warn("Discarding semantic mapping citing unknown source field {}",
+                        mapping.fieldId());
+                continue;
+            }
+
+            if (!isGroundedIn(source, mapping.value())) {
+                LOGGER.warn("Discarding semantic mapping for column {}: the value is not present"
+                                + " in source field {}",
+                        mapping.columnIndex(), mapping.fieldId());
                 continue;
             }
 
@@ -480,5 +508,59 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         }
 
         return usableMappings;
+    }
+
+    private boolean isMalformed(SemanticMapping mapping) {
+        return mapping == null
+                || mapping.fieldId() == null
+                || mapping.fieldId().isBlank()
+                || mapping.name() == null
+                || mapping.name().isBlank()
+                || mapping.value() == null
+                || mapping.value().isBlank()
+                || !Double.isFinite(mapping.confidence())
+                || mapping.confidence() < 0
+                || mapping.confidence() > 1;
+    }
+
+    /**
+     * Resolves the field a mapping cites. Ids are issued as {@code field-<index>}; the model
+     * may suffix them ({@code field-3-1}) when it pulls several values out of one element,
+     * so the leading index is what identifies the source.
+     */
+    private ExtractedField sourceFieldFor(String fieldId, Map<Integer, ExtractedField> fieldsByIndex) {
+        if (!fieldId.startsWith(FIELD_ID_PREFIX)) {
+            return null;
+        }
+        String[] parts = fieldId.substring(FIELD_ID_PREFIX.length()).split("-");
+        try {
+            return fieldsByIndex.get(Integer.parseInt(parts[0]));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether the value really occurs in the field it was taken from.
+     *
+     * <p>This is the check that stops the two failures a prompt cannot prevent: a value
+     * copied from a different field, and a value the model composed itself. Comparison is
+     * case-insensitive with whitespace collapsed, so a difference in spacing or casing is
+     * tolerated while a difference in content is not.
+     */
+    private boolean isGroundedIn(ExtractedField source, String value) {
+        String needle = comparable(value);
+        if (needle.isEmpty()) {
+            return false;
+        }
+        return comparable(source.value()).contains(needle)
+                || comparable(source.rawText()).contains(needle);
+    }
+
+    private String comparable(String text) {
+        if (text == null) {
+            return "";
+        }
+        return WHITESPACE_RUN.matcher(text).replaceAll(" ").strip().toLowerCase(Locale.ROOT);
     }
 }
