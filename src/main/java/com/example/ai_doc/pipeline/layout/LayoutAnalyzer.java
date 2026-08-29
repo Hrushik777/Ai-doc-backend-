@@ -6,6 +6,7 @@ import com.example.ai_doc.domain.layout.DocumentElement;
 import com.example.ai_doc.domain.layout.DocumentLayout;
 import com.example.ai_doc.domain.layout.LayoutRegion;
 import com.example.ai_doc.domain.layout.PageGeometry;
+import com.example.ai_doc.domain.layout.ParsedDocument;
 import com.example.ai_doc.domain.layout.RegionKind;
 import org.springframework.stereotype.Component;
 
@@ -85,6 +86,21 @@ public class LayoutAnalyzer {
      * fraction of the page means the same thing on A4 and on a phone photo, and so a
      * comparison between page 1 and page 3 is meaningful.
      */
+    /**
+     * Scales a parsed document into [0,1] without analysing it.
+     *
+     * <p>Exposed so that paths which bypass layout analysis - the raw field dump - still
+     * report coordinates in the same space as everything else. Two endpoints reporting the
+     * same rectangle in different units is the kind of inconsistency that is only ever
+     * discovered by someone drawing a box in the wrong place.
+     */
+    public ParsedDocument normalized(ParsedDocument parsed) {
+        if (parsed == null || parsed.isEmpty()) {
+            return ParsedDocument.empty();
+        }
+        return new ParsedDocument(normalize(parsed.elements(), parsed.pages()), parsed.pages());
+    }
+
     private List<DocumentElement> normalize(List<DocumentElement> elements, List<PageGeometry> pages) {
         Map<Integer, PageGeometry> geometryByPage = new LinkedHashMap<>();
         if (pages != null) {

@@ -34,6 +34,7 @@ import com.example.ai_doc.pipeline.mapping.HeaderFieldMapper;
 import com.example.ai_doc.pipeline.mapping.HeaderInferenceService;
 import com.example.ai_doc.pipeline.mapping.LayoutHeaderInferrer;
 import com.example.ai_doc.pipeline.mapping.LayoutRecordMapper;
+import com.example.ai_doc.pipeline.mapping.RawFieldRecordBuilder;
 import com.example.ai_doc.pipeline.mapping.SemanticMappingService;
 import com.example.ai_doc.pipeline.understanding.DocumentPageImage;
 import com.example.ai_doc.pipeline.understanding.DocumentUnderstandingService;
@@ -44,6 +45,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -76,6 +78,8 @@ public class DocumentProcessingService {
     private final LayoutRecordMapper layoutRecordMapper;
     private final ParsedDocumentFlattener parsedDocumentFlattener;
     private final HeaderInferenceService headerInferenceService;
+    private final RawFieldRecordBuilder rawFieldRecordBuilder;
+    private final NoTemplateMode noTemplateMode;
 
     @Autowired
     public DocumentProcessingService(DocumentFileValidator documentFileValidator,
@@ -87,7 +91,10 @@ public class DocumentProcessingService {
                                      LayoutAnalyzer layoutAnalyzer,
                                      LayoutRecordMapper layoutRecordMapper,
                                      ParsedDocumentFlattener parsedDocumentFlattener,
-                                     HeaderInferenceService headerInferenceService) {
+                                     HeaderInferenceService headerInferenceService,
+                                     RawFieldRecordBuilder rawFieldRecordBuilder,
+                                     @Value("${app.no-template.mode:INFERRED_HEADERS}")
+                                     NoTemplateMode noTemplateMode) {
         this.documentFileValidator = documentFileValidator;
         this.excelService = excelService;
         this.documentUnderstandingService = documentUnderstandingService;
@@ -98,6 +105,8 @@ public class DocumentProcessingService {
         this.layoutRecordMapper = layoutRecordMapper;
         this.parsedDocumentFlattener = parsedDocumentFlattener;
         this.headerInferenceService = headerInferenceService;
+        this.rawFieldRecordBuilder = rawFieldRecordBuilder;
+        this.noTemplateMode = noTemplateMode;
     }
 
     /**
@@ -112,7 +121,8 @@ public class DocumentProcessingService {
         this(documentFileValidator, excelService, documentUnderstandingService,
                 headerFieldMapper, semanticMappingService, new PdfDocumentRenderer(),
                 defaultLayoutAnalyzer(), new LayoutRecordMapper(headerFieldMapper),
-                new ParsedDocumentFlattener(), new LayoutHeaderInferrer()::infer);
+                new ParsedDocumentFlattener(), new LayoutHeaderInferrer()::infer,
+                new RawFieldRecordBuilder(), NoTemplateMode.INFERRED_HEADERS);
     }
 
     /** The layout stage has no configuration, so the legacy constructor can build its own. */
@@ -125,6 +135,28 @@ public class DocumentProcessingService {
                 new ColumnClusterer(),
                 new RegionClassifier(),
                 new RegionContinuationDetector());
+    }
+
+    /**
+     * What to do when a caller sends a document but no template.
+     *
+     * <p>Explicit rather than implied, because the two produce very different spreadsheets
+     * and which one is wanted depends on why the template is missing.
+     */
+    public enum NoTemplateMode {
+
+        /**
+         * Work out what the columns should be called - from the document's own header band
+         * or labels where it states them, and from the model where it does not - and fill
+         * them. Falls back to {@link #RAW_FIELDS} rather than returning nothing.
+         */
+        INFERRED_HEADERS,
+
+        /**
+         * Skip interpretation entirely and write out every extracted element with its type,
+         * page and coordinates. Nothing is decided, so nothing can be decided wrongly.
+         */
+        RAW_FIELDS
     }
 
     public ProcessedExcelFile process(MultipartFile document, MultipartFile template) {
@@ -380,9 +412,9 @@ public class DocumentProcessingService {
      */
     public BatchProcessedExcelFile processBatch(List<MultipartFile> documents, MultipartFile template) {
 
-        if (documents == null || documents.isEmpty()) {
-            throw new EmptyFileException("At least one document must be provided");
-        }
+        // Refuse an oversized batch before any of it is parsed, rather than discovering the
+        // limit part-way through with several documents already paid for.
+        documentFileValidator.validateBatch(documents);
 
         // With no template the columns come from the first document, so every later
         // document in the batch is filled against the same inferred header row.
@@ -581,7 +613,8 @@ public class DocumentProcessingService {
     private record PreparedWorkbook(Workbook workbook,
                                     ExcelTemplateInfo templateInfo,
                                     ParsedDocument parsed,
-                                    DocumentLayout layout) {
+                                    DocumentLayout layout,
+                                    boolean rawFields) {
 
         boolean headersWereInferred() {
             return parsed != null;
@@ -595,31 +628,64 @@ public class DocumentProcessingService {
     private PreparedWorkbook prepareWorkbook(MultipartFile document, MultipartFile template) {
         if (template != null) {
             Workbook workbook = excelService.openWorkbook(template);
-            return new PreparedWorkbook(workbook, excelService.readHeaders(workbook), null, null);
+            return new PreparedWorkbook(workbook, excelService.readHeaders(workbook), null, null, false);
         }
 
         ParsedDocument parsed = safeParse(document);
         DocumentLayout layout = analyzeLayout(parsed);
-        List<String> headers = headerInferenceService.inferHeaders(layout);
 
-        if (headers.isEmpty()) {
+        if (parsed.isEmpty()) {
             throw new NoExcelMappingsException(
-                    "No Excel template was supplied and the document did not yield any columns"
-                            + " to build one from - it may be blank, too low quality to read, or"
-                            + " in a layout the parse model did not recognise");
+                    "No Excel template was supplied and the document yielded no content to build"
+                            + " one from - it may be blank, too low quality to read, or in a"
+                            + " layout the parse model did not recognise");
         }
 
-        LOGGER.info("No template supplied for {}; inferred {} columns: {}",
-                document.getOriginalFilename(), headers.size(), headers);
+        if (noTemplateMode == NoTemplateMode.INFERRED_HEADERS) {
+            List<String> headers = headerInferenceService.inferHeaders(layout);
+            if (!headers.isEmpty()) {
+                LOGGER.info("No template supplied for {}; inferred {} columns: {}",
+                        document.getOriginalFilename(), headers.size(), headers);
+                ExcelService.SynthesizedTemplate synthesized = excelService.createWorkbook(headers);
+                return new PreparedWorkbook(
+                        synthesized.workbook(), synthesized.templateInfo(), parsed, layout, false);
+            }
+            // Naming the columns failed, but the document was read. Returning what was read
+            // beats returning an error: the caller can still see the content and act on it.
+            LOGGER.info("No template supplied for {} and no columns could be named;"
+                    + " writing the extracted fields as-is", document.getOriginalFilename());
+        }
 
-        ExcelService.SynthesizedTemplate synthesized = excelService.createWorkbook(headers);
-        return new PreparedWorkbook(synthesized.workbook(), synthesized.templateInfo(), parsed, layout);
+        ExcelService.SynthesizedTemplate synthesized =
+                excelService.createWorkbook(RawFieldRecordBuilder.HEADERS);
+        return new PreparedWorkbook(
+                synthesized.workbook(), synthesized.templateInfo(), parsed, layout, true);
     }
 
     private DocumentMapping mapDocument(MultipartFile document, PreparedWorkbook prepared) {
+        if (prepared.rawFields()) {
+            return rawFieldMapping(prepared.parsed());
+        }
         return prepared.headersWereInferred()
                 ? computeRecords(document, prepared.parsed(), prepared.layout(), prepared.templateInfo())
                 : computeRecordsForDocument(document, prepared.templateInfo());
+    }
+
+    /**
+     * The interpretation-free path: every extracted element becomes a row, geometry included.
+     * No mapping stage runs, so no model is called and nothing can be placed wrongly.
+     */
+    private DocumentMapping rawFieldMapping(ParsedDocument parsed) {
+        // Normalized so the coordinates in this sheet mean the same thing as the ones
+        // the explanation endpoint reports for the same document.
+        ExtractedDocumentData extracted =
+                parsedDocumentFlattener.flatten(layoutAnalyzer.normalized(parsed));
+        List<MappedRecord> records = rawFieldRecordBuilder.build(extracted);
+
+        LOGGER.info("Writing {} extracted fields without interpretation", records.size());
+
+        return new DocumentMapping(records, Map.of(), extracted.fields(), List.of(),
+                extracted.fields().size(), 0, extracted.fields().size(), false);
     }
 
     private ParsedDocument safeParse(MultipartFile document) {

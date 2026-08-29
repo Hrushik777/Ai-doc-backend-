@@ -168,6 +168,44 @@ class DocumentProcessingMultiRowTest {
         assertThat(firstTag.y()).isLessThan(0.2);
     }
 
+    /**
+     * No template, and a document whose columns cannot be named - loose prose with no header
+     * band and no labels. This used to be a 422 with no output at all. Returning what was
+     * read, with its geometry, is more use than an error: the caller can see the content and
+     * decide what to do with it.
+     */
+    @Test
+    void aDocumentWhoseColumnsCannotBeNamedStillProducesAWorkbook() throws IOException {
+        List<DocumentElement> prose = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            double y = 100 + i * 40;
+            prose.add(new DocumentElement(1, "an unlabelled line of narrative " + i, "text",
+                    new BBox(100, y, 700, y + 18)));
+        }
+        given(understandingService.parse(any()))
+                .willReturn(new ParsedDocument(prose, List.of(new PageGeometry(1, 1000, 1000))));
+
+        ProcessedExcelFile result = processingService.process(pdf("prose.pdf"), null);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(result.content()))) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            Row headerRow = sheet.getRow(0);
+            assertThat(headerRow.getCell(0).getStringCellValue()).isEqualTo("Field");
+            assertThat(headerRow.getCell(1).getStringCellValue()).isEqualTo("Value");
+            assertThat(headerRow.getCell(3).getStringCellValue()).isEqualTo("Page");
+
+            // One row per element, geometry preserved.
+            assertThat(sheet.getRow(1).getCell(1).getStringCellValue())
+                    .isEqualTo("an unlabelled line of narrative 0");
+            assertThat(sheet.getRow(1).getCell(3).getStringCellValue()).isEqualTo("1");
+            assertThat(sheet.getRow(1).getCell(4).getStringCellValue()).isEqualTo("0.1000");
+            assertThat(sheet.getRow(4).getCell(1).getStringCellValue())
+                    .isEqualTo("an unlabelled line of narrative 3");
+            assertThat(sheet.getRow(5)).isNull();
+        }
+    }
+
     // ------------------------------------------------------------------------- fixtures
 
     private ParsedDocument equipmentTable() {
