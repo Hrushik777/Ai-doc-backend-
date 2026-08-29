@@ -30,6 +30,13 @@ public class HeaderNameNormalizer {
             stripped = WHITESPACE_RUN.matcher(stripped).replaceAll(" ");
         }
 
+        // A label keeps its colon ("Tag Number:") where a template header does not, and the
+        // two mean the same column. Dropping a trailing colon is enough to make them agree
+        // without touching punctuation that carries meaning, such as "Pressure (psi)".
+        while (stripped.endsWith(":")) {
+            stripped = stripped.substring(0, stripped.length() - 1).strip();
+        }
+
         return stripped.toLowerCase(Locale.ROOT);
     }
 

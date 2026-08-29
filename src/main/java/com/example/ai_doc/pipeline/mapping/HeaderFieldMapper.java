@@ -8,6 +8,7 @@ import com.example.ai_doc.domain.mapping.DeterministicMappingResult;
 import com.example.ai_doc.domain.mapping.IndexedExtractedField;
 import com.example.ai_doc.domain.mapping.MappingSource;
 import com.example.ai_doc.domain.mapping.ResolvedFieldMapping;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -20,14 +21,17 @@ import java.util.Map;
 public class HeaderFieldMapper {
 
     private final HeaderNameNormalizer headerNameNormalizer;
+    private final HeaderAliases headerAliases;
 
     public HeaderFieldMapper(HeaderNameNormalizer headerNameNormalizer) {
-        this.headerNameNormalizer = headerNameNormalizer;
+        this(headerNameNormalizer, new HeaderAliases());
     }
-    private static final Map<String, String> HEADER_ALIASES = Map.of(
-            "mfr", "manufacturer",
-            "mawp", "maximum allowable working pressure"
-    );
+
+    @Autowired
+    public HeaderFieldMapper(HeaderNameNormalizer headerNameNormalizer, HeaderAliases headerAliases) {
+        this.headerNameNormalizer = headerNameNormalizer;
+        this.headerAliases = headerAliases;
+    }
 
     public Map<Integer, String> mapToColumns(ExcelTemplateInfo templateInfo,
                                              ExtractedDocumentData extractedDocumentData) {
@@ -63,7 +67,7 @@ public class HeaderFieldMapper {
     }
 
     /**
-     * Normalized template header name to the columns carrying it. Public so the layout-aware
+     * Canonical header key to the columns carrying it. Public so the layout-aware
      * mapper resolves headers through exactly the same normalization and alias rules as the
      * flat path - two matching implementations would drift, and a header that resolved on one
      * path but not the other would be all but impossible to explain.
@@ -74,12 +78,12 @@ public class HeaderFieldMapper {
         // template order.
         Map<String, List<ExcelColumn>> columnsByNormalizedHeader = new LinkedHashMap<>();
         for (ExcelColumn header : headers) {
-            String normalizedHeaderName = headerNameNormalizer.normalize(header.headerName());
-            if (normalizedHeaderName.isEmpty()) {
+            String headerKey = matchKey(header.headerName());
+            if (headerKey.isEmpty()) {
                 continue;
             }
             columnsByNormalizedHeader
-                    .computeIfAbsent(normalizedHeaderName, key -> new ArrayList<>(1))
+                    .computeIfAbsent(headerKey, key -> new ArrayList<>(1))
                     .add(header);
         }
         return columnsByNormalizedHeader;
@@ -95,14 +99,13 @@ public class HeaderFieldMapper {
             return false;
         }
 
-        String normalizedFieldName =
-                headerNameNormalizer.normalize(field.name());
+        String fieldKey = matchKey(field.name());
 
-        if (normalizedFieldName.isEmpty()) {
+        if (fieldKey.isEmpty()) {
             return false;
         }
 
-        List<ExcelColumn> matchingColumns = columnsByNormalizedHeader.get(matchKey(normalizedFieldName));
+        List<ExcelColumn> matchingColumns = columnsByNormalizedHeader.get(fieldKey);
 
         if (matchingColumns == null) {
             return false;
@@ -129,10 +132,15 @@ public class HeaderFieldMapper {
         return true;
     }
 
-    /** Normalizes a name and resolves any known abbreviation, for header lookup. */
+    /**
+     * The single canonical key a name is matched on: normalized, then de-abbreviated.
+     *
+     * <p>Both template headers and document field names go through this, which is what makes
+     * matching symmetric - {@code Mfr} and {@code Manufacturer} resolve to one key whichever
+     * side of the comparison they appear on.
+     */
     public String matchKey(String name) {
-        String normalized = headerNameNormalizer.normalize(name);
-        return HEADER_ALIASES.getOrDefault(normalized, normalized);
+        return headerAliases.canonicalize(headerNameNormalizer.normalize(name));
     }
 
     private ResolvedFieldMapping choosePreferredMapping(ResolvedFieldMapping existing,
