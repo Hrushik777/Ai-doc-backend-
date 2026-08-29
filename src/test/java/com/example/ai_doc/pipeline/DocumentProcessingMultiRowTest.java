@@ -1,5 +1,6 @@
 package com.example.ai_doc.pipeline;
 
+import com.example.ai_doc.TestFiles;
 import com.example.ai_doc.api.dto.ExplainedMapping;
 import com.example.ai_doc.api.dto.ProcessExplanation;
 import com.example.ai_doc.domain.layout.BBox;
@@ -191,7 +192,7 @@ class DocumentProcessingMultiRowTest {
     }
 
     private MockMultipartFile pdf(String filename) {
-        return new MockMultipartFile("document", filename, "application/pdf", new byte[]{1, 2});
+        return new MockMultipartFile("document", filename, "application/pdf", TestFiles.pdf("1-2"));
     }
 
     private MockMultipartFile equipmentTemplate() throws IOException {

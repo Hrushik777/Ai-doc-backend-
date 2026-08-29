@@ -5,6 +5,9 @@ import com.example.ai_doc.api.error.InvalidExcelTemplateException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
+
 import java.util.Locale;
 import java.util.Set;
 
@@ -37,5 +40,24 @@ public class ExcelTemplateValidator {
         if (contentType != null && !PERMITTED_CONTENT_TYPES.contains(contentType)) {
             throw new InvalidExcelTemplateException("Excel template must use the XLSX content type");
         }
+
+        // An .xlsx is a zip archive. Checking for the archive header rejects a mislabelled
+        // file here rather than letting POI fail on it with a less useful message.
+        if (!isZipArchive(template)) {
+            throw new InvalidExcelTemplateException("Excel template is not a readable XLSX file");
+        }
+    }
+
+    private boolean isZipArchive(MultipartFile template) {
+        byte[] header = new byte[4];
+        try (InputStream inputStream = template.getInputStream()) {
+            if (inputStream.readNBytes(header, 0, 4) < 4) {
+                return false;
+            }
+        } catch (IOException exception) {
+            return false;
+        }
+        return header[0] == 0x50 && header[1] == 0x4B
+                && (header[2] == 0x03 || header[2] == 0x05 || header[2] == 0x07);
     }
 }

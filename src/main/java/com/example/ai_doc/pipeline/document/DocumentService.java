@@ -4,6 +4,7 @@ import com.example.ai_doc.persistence.Document;
 import com.example.ai_doc.api.error.DocumentProcessingException;
 import com.example.ai_doc.persistence.DocumentRepository;
 import com.example.ai_doc.pipeline.validation.DocumentFileValidator;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,15 +17,16 @@ import java.time.LocalDateTime;
 @Service
 public class DocumentService {
 
-    private final Path uploadDirectory = Paths.get("Uploads");
-
+    private final Path uploadDirectory;
     private final DocumentRepository documentRepository;
     private final DocumentFileValidator documentFileValidator;
 
     public DocumentService(DocumentRepository documentRepository,
-                           DocumentFileValidator documentFileValidator) {
+                           DocumentFileValidator documentFileValidator,
+                           @Value("${app.upload.directory:Uploads}") String uploadDirectory) {
         this.documentRepository = documentRepository;
         this.documentFileValidator = documentFileValidator;
+        this.uploadDirectory = Paths.get(uploadDirectory).toAbsolutePath().normalize();
     }
 
     public void saveDocument(MultipartFile file) {
@@ -32,7 +34,18 @@ public class DocumentService {
 
         try {
             Files.createDirectories(uploadDirectory);
-            Path filePath = uploadDirectory.resolve(file.getOriginalFilename());
+
+            Path filePath = uploadDirectory
+                    .resolve(StoredFilename.sanitize(file.getOriginalFilename()))
+                    .normalize();
+
+            // Belt and braces. Sanitizing already removes every separator, so this can only
+            // fire if that ever regresses - and a write outside the upload directory is not
+            // a failure worth discovering in production.
+            if (!filePath.startsWith(uploadDirectory)) {
+                throw new DocumentProcessingException("Resolved upload path escaped the upload directory");
+            }
+
             Files.write(filePath, file.getBytes());
             Document document = new Document(
                     file.getOriginalFilename(),

@@ -1,5 +1,6 @@
 package com.example.ai_doc.api;
 
+import com.example.ai_doc.TestFiles;
 import com.example.ai_doc.api.error.AIServiceNotConfiguredException;
 import com.example.ai_doc.api.error.GlobalExceptionHandler;
 import com.example.ai_doc.domain.result.BatchItemResult;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,7 +46,7 @@ class DocumentControllerTest {
     @Test
     void existingUploadEndpointStillAcceptsTheFileParameter() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "scan.pdf", "application/pdf", new byte[]{1});
+                "file", "scan.pdf", "application/pdf", TestFiles.pdf("1"));
 
         mockMvc.perform(multipart("/api/documents").file(file))
                 .andExpect(status().isOk())
@@ -56,7 +58,7 @@ class DocumentControllerTest {
     @Test
     void processEndpointReturnsTheCompletedExcelAsAnAttachment() throws Exception {
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1"));
         MockMultipartFile template = new MockMultipartFile(
                 "template", "template.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1});
@@ -74,7 +76,7 @@ class DocumentControllerTest {
     @Test
     void processEndpointReportsThatAiExtractionIsNotConfigured() throws Exception {
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1"));
         MockMultipartFile template = new MockMultipartFile(
                 "template", "template.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1});
@@ -83,15 +85,18 @@ class DocumentControllerTest {
 
         mockMvc.perform(multipart("/api/documents/process").file(document).file(template))
                 .andExpect(status().isNotImplemented())
-                .andExpect(content().string("Document understanding is not configured"));
+                // Errors carry a stable code and never echo an internal message verbatim.
+                .andExpect(jsonPath("$.code").value("AI_NOT_CONFIGURED"))
+                .andExpect(jsonPath("$.status").value(501))
+                .andExpect(jsonPath("$.message").isNotEmpty());
     }
 
     @Test
     void batchProcessEndpointReturnsCompletedExcelWithBatchHeaders() throws Exception {
         MockMultipartFile document1 = new MockMultipartFile(
-                "documents", "scan1.pdf", "application/pdf", new byte[]{1});
+                "documents", "scan1.pdf", "application/pdf", TestFiles.pdf("1"));
         MockMultipartFile document2 = new MockMultipartFile(
-                "documents", "scan2.pdf", "application/pdf", new byte[]{2});
+                "documents", "scan2.pdf", "application/pdf", TestFiles.pdf("2"));
         MockMultipartFile template = new MockMultipartFile(
                 "template", "template.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1});

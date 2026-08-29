@@ -1,5 +1,6 @@
 package com.example.ai_doc.pipeline;
 
+import com.example.ai_doc.TestFiles;
 import com.example.ai_doc.api.error.DocumentProcessingException;
 import com.example.ai_doc.api.error.EmptyFileException;
 import com.example.ai_doc.api.error.NoExcelMappingsException;
@@ -50,7 +51,7 @@ class DocumentProcessingServiceTest {
                 new DocumentFileValidator(), excelService, understandingService, headerFieldMapper,
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         given(understandingService.extractFields(any())).willReturn(new ExtractedDocumentData(List.of(
                 new ExtractedField("pressure", "125 PSI"),
@@ -80,7 +81,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplateWithPressureHeader();
         // Neither field name aliases or exactly matches "Maximum Allowable Working Pressure",
         // so both stay unmatched and this exercises the semantic-vs-semantic tie-break.
@@ -112,7 +113,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         // Both template columns match deterministically, but plenty of prose fields stay
         // unmatched - the LLM still has nothing it could contribute.
@@ -144,7 +145,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         // "Pressure" resolves deterministically; "Temperature" does not.
         given(understandingService.extractFields(any())).willReturn(new ExtractedDocumentData(List.of(
@@ -173,7 +174,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         // "Pressure" resolves deterministically; "Ambient Temp" needs the LLM, which fails.
         given(understandingService.extractFields(any())).willReturn(new ExtractedDocumentData(List.of(
@@ -203,7 +204,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         given(understandingService.extractFields(any()))
                 .willReturn(new ExtractedDocumentData(List.of()));
@@ -226,7 +227,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "document", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "document", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         given(understandingService.extractFields(any())).willReturn(new ExtractedDocumentData(List.of(
                 new ExtractedField("Totally unrelated", "some value")
@@ -249,11 +250,11 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document1 = new MockMultipartFile(
-                "documents", "scan1.pdf", "application/pdf", new byte[]{1});
+                "documents", "scan1.pdf", "application/pdf", TestFiles.pdf("1"));
         MockMultipartFile document2 = new MockMultipartFile(
-                "documents", "scan2.pdf", "application/pdf", new byte[]{2});
+                "documents", "scan2.pdf", "application/pdf", TestFiles.pdf("2"));
         MockMultipartFile document3 = new MockMultipartFile(
-                "documents", "scan3.pdf", "application/pdf", new byte[]{3});
+                "documents", "scan3.pdf", "application/pdf", TestFiles.pdf("3"));
         MockMultipartFile template = xlsxTemplate();
         given(understandingService.extractFields(document1)).willReturn(new ExtractedDocumentData(List.of(
                 new ExtractedField("Pressure", "100 PSI"), new ExtractedField("Temperature", "70 C"))));
@@ -292,11 +293,11 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document1 = new MockMultipartFile(
-                "documents", "scan1.pdf", "application/pdf", new byte[]{1});
+                "documents", "scan1.pdf", "application/pdf", TestFiles.pdf("1"));
         MockMultipartFile document2 = new MockMultipartFile(
-                "documents", "scan2.pdf", "application/pdf", new byte[]{2});
+                "documents", "scan2.pdf", "application/pdf", TestFiles.pdf("2"));
         MockMultipartFile document3 = new MockMultipartFile(
-                "documents", "scan3.pdf", "application/pdf", new byte[]{3});
+                "documents", "scan3.pdf", "application/pdf", TestFiles.pdf("3"));
         MockMultipartFile template = xlsxTemplate();
         given(understandingService.extractFields(document1)).willReturn(new ExtractedDocumentData(List.of(
                 new ExtractedField("Pressure", "100 PSI"), new ExtractedField("Temperature", "70 C"))));
@@ -349,7 +350,7 @@ class DocumentProcessingServiceTest {
                 new HeaderFieldMapper(new HeaderNameNormalizer()),
                 semanticMappingService);
         MockMultipartFile document = new MockMultipartFile(
-                "documents", "scan.pdf", "application/pdf", new byte[]{1, 2});
+                "documents", "scan.pdf", "application/pdf", TestFiles.pdf("1-2"));
         MockMultipartFile template = xlsxTemplate();
         given(understandingService.extractFields(any())).willReturn(new ExtractedDocumentData(List.of(
                 new ExtractedField("pressure", "125 PSI"),

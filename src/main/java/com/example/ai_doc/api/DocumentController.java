@@ -18,11 +18,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@CrossOrigin(
-        origins = {"http://localhost:5173", "http://localhost:5174"},
-        // Without these the browser cannot read the batch outcome headers below:
-        // they are not CORS-safelisted, so fetch() silently hides them.
-        exposedHeaders = {"X-Batch-Total-Count", "X-Batch-Success-Count", "X-Batch-Failed-Files"})
 @RequestMapping("/api/documents")
 public class DocumentController {
 
