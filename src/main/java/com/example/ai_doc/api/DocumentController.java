@@ -1,6 +1,6 @@
 package com.example.ai_doc.api;
 
-import com.example.ai_doc.pipeline.document.DocumentService;
+// import com.example.ai_doc.pipeline.document.DocumentService;
 import com.example.ai_doc.domain.result.BatchItemResult;
 import com.example.ai_doc.domain.result.BatchProcessedExcelFile;
 import com.example.ai_doc.api.dto.ProcessExplanation;
@@ -21,23 +21,26 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/documents")
 public class DocumentController {
 
-    private final DocumentService documentService;
+    // Disabled along with the database. DocumentService is no longer a bean, so injecting it
+    // here would fail the context at startup.
+    // private final DocumentService documentService;
     private final DocumentProcessingService documentProcessingService;
 
-    public DocumentController(DocumentService documentService,
-                              DocumentProcessingService documentProcessingService) {
-        this.documentService = documentService;
+    public DocumentController(DocumentProcessingService documentProcessingService) {
         this.documentProcessingService = documentProcessingService;
     }
 
-    @PostMapping
-    public ResponseEntity<String> uploadDocument(
-            @RequestParam("file") MultipartFile file) {
-
-        documentService.saveDocument(file);
-
-        return ResponseEntity.ok("Document uploaded successfully");
-    }
+    // Disabled along with the database. This endpoint wrote the upload to local disk and a row
+    // to MySQL; nothing ever read either back, and no other endpoint depends on it.
+    //
+    // @PostMapping
+    // public ResponseEntity<String> uploadDocument(
+    //         @RequestParam("file") MultipartFile file) {
+    //
+    //     documentService.saveDocument(file);
+    //
+    //     return ResponseEntity.ok("Document uploaded successfully");
+    // }
 
     /**
      * Fills the supplied template from the document. The template is optional: without one,

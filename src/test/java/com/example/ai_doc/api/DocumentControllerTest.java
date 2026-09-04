@@ -6,7 +6,7 @@ import com.example.ai_doc.api.error.GlobalExceptionHandler;
 import com.example.ai_doc.domain.result.BatchItemResult;
 import com.example.ai_doc.domain.result.BatchProcessedExcelFile;
 import com.example.ai_doc.domain.result.ProcessedExcelFile;
-import com.example.ai_doc.pipeline.document.DocumentService;
+// import com.example.ai_doc.pipeline.document.DocumentService;
 import com.example.ai_doc.pipeline.DocumentProcessingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+// import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,31 +29,33 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class DocumentControllerTest {
 
-    private DocumentService documentService;
+    // private DocumentService documentService;
     private DocumentProcessingService documentProcessingService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        documentService = mock(DocumentService.class);
         documentProcessingService = mock(DocumentProcessingService.class);
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new DocumentController(documentService, documentProcessingService))
+                        new DocumentController(documentProcessingService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 
-    @Test
-    void existingUploadEndpointStillAcceptsTheFileParameter() throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "scan.pdf", "application/pdf", TestFiles.pdf("1"));
-
-        mockMvc.perform(multipart("/api/documents").file(file))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Document uploaded successfully"));
-
-        verify(documentService).saveDocument(any());
-    }
+    // Disabled along with the database: the upload endpoint it covers is commented out in
+    // DocumentController, so there is no route left to exercise.
+    //
+    // @Test
+    // void existingUploadEndpointStillAcceptsTheFileParameter() throws Exception {
+    //     MockMultipartFile file = new MockMultipartFile(
+    //             "file", "scan.pdf", "application/pdf", TestFiles.pdf("1"));
+    //
+    //     mockMvc.perform(multipart("/api/documents").file(file))
+    //             .andExpect(status().isOk())
+    //             .andExpect(content().string("Document uploaded successfully"));
+    //
+    //     verify(documentService).saveDocument(any());
+    // }
 
     @Test
     void processEndpointReturnsTheCompletedExcelAsAnAttachment() throws Exception {

@@ -14,7 +14,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 
-@Service
+// Disabled along with the database: without JPA auto-configuration there is no
+// DocumentRepository bean for this service to depend on. The class is kept intact so
+// persistence can be restored by uncommenting this annotation, the datasource and JPA
+// properties, and the upload endpoint in DocumentController.
+// @Service
 public class DocumentService {
 
     private final Path uploadDirectory;
