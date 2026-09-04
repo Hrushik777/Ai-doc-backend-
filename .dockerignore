@@ -1,0 +1,18 @@
+# Everything here would otherwise be uploaded to the build daemon on every deploy. graphify-out
+# alone carries a 39,000-line graph.json plus a dated backup copy of it.
+target/
+.git/
+.gitignore
+.gitattributes
+.idea/
+
+# The image builds with the Maven from its base image, not the wrapper - and the wrapper jar is
+# gitignored anyway, so a fresh clone could not use it.
+.mvn/
+mvnw
+mvnw.cmd
+
+graphify-out/
+Uploads/
+.claude/
+*.md
