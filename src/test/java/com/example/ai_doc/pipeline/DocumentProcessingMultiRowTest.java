@@ -171,8 +171,13 @@ class DocumentProcessingMultiRowTest {
     /**
      * No template, and a document whose columns cannot be named - loose prose with no header
      * band and no labels. This used to be a 422 with no output at all. Returning what was
-     * read, with its geometry, is more use than an error: the caller can see the content and
-     * decide what to do with it.
+     * read is more use than an error: the caller can see the content and decide what to do
+     * with it.
+     *
+     * <p>What comes back is the field, its value and its page. The element type and bounding
+     * box are no longer written by default: a caller reaching this path has already had
+     * headers declined, and answering that with columns of normalized coordinates buries the
+     * content they came for.
      */
     @Test
     void aDocumentWhoseColumnsCannotBeNamedStillProducesAWorkbook() throws IOException {
@@ -193,13 +198,14 @@ class DocumentProcessingMultiRowTest {
             Row headerRow = sheet.getRow(0);
             assertThat(headerRow.getCell(0).getStringCellValue()).isEqualTo("Field");
             assertThat(headerRow.getCell(1).getStringCellValue()).isEqualTo("Value");
-            assertThat(headerRow.getCell(3).getStringCellValue()).isEqualTo("Page");
+            assertThat(headerRow.getCell(2).getStringCellValue()).isEqualTo("Page");
+            // Nothing past Page: no Type, and no X/Y/Width/Height.
+            assertThat(headerRow.getCell(3)).isNull();
 
-            // One row per element, geometry preserved.
+            // One row per element.
             assertThat(sheet.getRow(1).getCell(1).getStringCellValue())
                     .isEqualTo("an unlabelled line of narrative 0");
-            assertThat(sheet.getRow(1).getCell(3).getStringCellValue()).isEqualTo("1");
-            assertThat(sheet.getRow(1).getCell(4).getStringCellValue()).isEqualTo("0.1000");
+            assertThat(sheet.getRow(1).getCell(2).getStringCellValue()).isEqualTo("1");
             assertThat(sheet.getRow(4).getCell(1).getStringCellValue())
                     .isEqualTo("an unlabelled line of narrative 3");
             assertThat(sheet.getRow(5)).isNull();

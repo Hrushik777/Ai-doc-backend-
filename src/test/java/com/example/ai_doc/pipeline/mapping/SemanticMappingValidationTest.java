@@ -155,6 +155,66 @@ class SemanticMappingValidationTest {
                 .containsExactly("siemens ag");
     }
 
+    /**
+     * The failure this guards against is subtle and was live until grounding learned about
+     * token boundaries: a count nobody wrote down, "grounded" by the digit turning up inside
+     * an unrelated year. Plain containment accepted it and the workbook reported a fabricated
+     * number as if the document had stated it.
+     */
+    @Test
+    void rejectsAShortValueThatOnlyAppearsInsideALargerNumber() throws Exception {
+        respondWith("""
+                {"mappings":[{"fieldId":"field-0","name":"Tag Number","value":"4",
+                "columnIndex":0,"confidence":0.95,"reason":"counted the projects"}]}
+                """);
+
+        assertThat(map(field(0, "Experience", "Joined in 2024", "Experience: Joined in 2024")))
+                .isEmpty();
+    }
+
+    /** The same short value is fine when the document really does state it on its own. */
+    @Test
+    void acceptsAShortValueThatStandsAsItsOwnToken() throws Exception {
+        respondWith("""
+                {"mappings":[{"fieldId":"field-0","name":"Tag Number","value":"4",
+                "columnIndex":0,"confidence":0.95,"reason":"stated by the document"}]}
+                """);
+
+        assertThat(map(field(0, "Bays", "4 bays in total", "Bays: 4 bays in total")))
+                .extracting(SemanticMapping::value)
+                .containsExactly("4");
+    }
+
+    /** Punctuation is a boundary too, so a decimal reading is still grounded. */
+    @Test
+    void acceptsAShortValueDelimitedByPunctuation() throws Exception {
+        respondWith("""
+                {"mappings":[{"fieldId":"field-0","name":"Equipment Type","value":"3.5",
+                "columnIndex":1,"confidence":0.95,"reason":"second column of the reading"}]}
+                """);
+
+        assertThat(map(field(0, "Reading", "1 - 3.5", "Reading: 1 - 3.5")))
+                .extracting(SemanticMapping::value)
+                .containsExactly("3.5");
+    }
+
+    /**
+     * A longer value may legitimately sit inside a bigger cell - a name within a heading -
+     * so the boundary rule must not start rejecting those.
+     */
+    @Test
+    void stillAcceptsALongerValueFoundInsideALargerField() throws Exception {
+        respondWith("""
+                {"mappings":[{"fieldId":"field-0","name":"Manufacturer","value":"Siemens",
+                "columnIndex":2,"confidence":0.95,"reason":"named in the heading"}]}
+                """);
+
+        assertThat(map(field(0, "Heading", "Supplied by SiemensAG Industrial",
+                "Supplied by SiemensAG Industrial")))
+                .extracting(SemanticMapping::value)
+                .containsExactly("Siemens");
+    }
+
     // ------------------------------------------------------------------------- helpers
 
     private void respondWith(String json) throws Exception {

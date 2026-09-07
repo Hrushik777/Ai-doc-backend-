@@ -432,9 +432,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/DocumentProcessingService.java": {
-    "mtime": 1788582115.3503058,
-    "seen": 1788582382.9642303,
-    "ast_hash": "8191882b70f4644790ea72080d0038c7",
+    "mtime": 1787992522.1487637,
+    "seen": 1788508765.95791,
+    "ast_hash": "e5ce1c8639cee7d9fa396d61192e5b62",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/document/DocumentService.java": {
@@ -558,9 +558,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/NemotronHeaderInferenceService.java": {
-    "mtime": 1788582050.1145868,
-    "seen": 1788582382.9642303,
-    "ast_hash": "7e5d847b8dfb5c202f03d021b9bc94d9",
+    "mtime": 1788580874.467545,
+    "seen": 1788581325.5600352,
+    "ast_hash": "2e0aa3ca5e6dc7d87b87ca4e52c4f3e5",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/NemotronSemanticMappingService.java": {
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/RawFieldRecordBuilder.java": {
-    "mtime": 1788582123.6649702,
-    "seen": 1788582382.9642303,
-    "ast_hash": "6733939f9f6709f212205844af58e14f",
+    "mtime": 1787982794.9478388,
+    "seen": 1787991861.164619,
+    "ast_hash": "bc87986cfee609e2b6e1782129b7285e",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/mapping/SemanticMappingService.java": {
@@ -696,9 +696,9 @@
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/DocumentProcessingMultiRowTest.java": {
-    "mtime": 1788582272.3464508,
-    "seen": 1788582382.9642303,
-    "ast_hash": "4673e4255e24b5bf809804e429c70c93",
+    "mtime": 1787992522.152814,
+    "seen": 1788508765.95791,
+    "ast_hash": "bad046f466154019d68868dbdc56c69d",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/pipeline/DocumentProcessingServiceTest.java": {
@@ -789,12 +789,6 @@
     "mtime": 1788581116.108569,
     "seen": 1788581325.5600352,
     "ast_hash": "5c447fa6d9650f01fbfd5a2c4277f557",
-    "semantic_hash": ""
-  },
-  "src/test/java/com/example/ai_doc/pipeline/mapping/RawFieldRecordBuilderTest.java": {
-    "mtime": 1788582286.899381,
-    "seen": 1788582382.9642303,
-    "ast_hash": "0dbb0ae9613cd4aad3e3d8edb1aed219",
     "semantic_hash": ""
   }
 }

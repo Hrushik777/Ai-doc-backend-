@@ -32,9 +32,11 @@ import java.util.Set;
  * element's position - is sent along, because where a value sits is often the only clue to
  * what it is.
  *
- * <p>{@link LayoutHeaderInferrer} still runs first, and its result is offered to the model
- * as a starting point. If the call fails or comes back unusable, those deterministic headers
- * are used instead, so a document without a template never fails purely because the model
+ * <p>{@link LayoutHeaderInferrer} runs first and settles it whenever the document states its
+ * own column names, so the model is reached for only the documents that do not - which is both
+ * the faster path and the grounded one. Where the model is consulted, those deterministic
+ * headers go with the request as a starting point, and are used as-is if the call fails or
+ * comes back unusable, so a document without a template never fails purely because the model
  * was unreachable.
  */
 @Service
@@ -75,26 +77,46 @@ public class NemotronHeaderInferenceService implements HeaderInferenceService {
     {"headers": ["Index", "Value"]}
     """;
 
+    private static final String STRICT_JSON_REMINDER = """
+    Your previous response could not be parsed as JSON. Respond again with ONLY a single
+    valid JSON object - no explanations, no prose, no markdown fences, no text before or
+    after the JSON. Use exactly this shape: {"headers": ["Index", "Value"]}
+    """;
+
+    private static final int MAX_HEADER_ATTEMPTS = 2;
+
     private final NvidiaChatCompletionClient nvidiaChatCompletionClient;
     private final ObjectMapper objectMapper;
     private final LayoutHeaderInferrer layoutHeaderInferrer;
     private final String mappingModel;
     private final int maxTokens;
     private final int maxCellsSent;
+    private final boolean preferDocumentHeaders;
+    private final boolean jsonMode;
+    private final boolean disableThinking;
 
     public NemotronHeaderInferenceService(
             NvidiaChatCompletionClient nvidiaChatCompletionClient,
             ObjectMapper objectMapper,
             LayoutHeaderInferrer layoutHeaderInferrer,
             @Value("${nvidia.mapping.model:nvidia/nemotron-3-super-120b-a12b}") String mappingModel,
-            @Value("${nvidia.headers.max-tokens:1024}") int maxTokens,
-            @Value("${nvidia.headers.max-cells:400}") int maxCellsSent) {
+            @Value("${nvidia.headers.max-tokens:3072}") int maxTokens,
+            @Value("${nvidia.headers.max-cells:400}") int maxCellsSent,
+            @Value("${app.headers.prefer-document-headers:true}") boolean preferDocumentHeaders,
+            @Value("${nvidia.headers.json-mode:true}") boolean jsonMode,
+            @Value("${nvidia.headers.disable-thinking:true}") boolean disableThinking) {
+        if (maxTokens <= 0) {
+            throw new IllegalArgumentException("nvidia.headers.max-tokens must be greater than 0");
+        }
         this.nvidiaChatCompletionClient = nvidiaChatCompletionClient;
         this.objectMapper = objectMapper;
         this.layoutHeaderInferrer = layoutHeaderInferrer;
         this.mappingModel = mappingModel;
         this.maxTokens = maxTokens;
         this.maxCellsSent = maxCellsSent;
+        this.preferDocumentHeaders = preferDocumentHeaders;
+        this.jsonMode = jsonMode;
+        this.disableThinking = disableThinking;
     }
 
     @Override
@@ -105,22 +127,59 @@ public class NemotronHeaderInferenceService implements HeaderInferenceService {
             return deterministicHeaders;
         }
 
-        try {
-            List<String> proposed = parseHeaders(nvidiaChatCompletionClient.complete(
-                    buildRequest(layout, deterministicHeaders), "header inference"));
-            if (!proposed.isEmpty()) {
-                return proposed;
+        // A document that states its own column names is already the answer, and asking the
+        // model to restate them can only change them. LayoutHeaderInferrer is deliberately
+        // strict about what counts as stated - a clean header band with no blanks, no
+        // duplicates and no sentences - so when it returns anything, it read it off the page.
+        //
+        // Set app.headers.prefer-document-headers=false to consult the model even then, which
+        // is worth doing for documents whose header cells pack several values into one.
+        if (preferDocumentHeaders && !deterministicHeaders.isEmpty()) {
+            LOGGER.debug("Using the {} headers the document states about itself; skipping the model",
+                    deterministicHeaders.size());
+            return deterministicHeaders;
+        }
+
+        // Two attempts, for the same reasons the mapping stage takes two. Attempt 1 asks the
+        // endpoint to constrain decoding to JSON and switch reasoning off. Attempt 2 drops both
+        // - an endpoint that rejects either would otherwise fail every call this service ever
+        // makes - doubles the budget, and reminds the model to answer in JSON.
+        //
+        // Getting this wrong is expensive out of proportion to the call: when header inference
+        // comes back empty the pipeline has nothing to name columns after, and falls through to
+        // writing raw extracted fields with their page coordinates. A single rejected parameter
+        // was enough to turn every templateless document into that dump.
+        for (int attempt = 1; attempt <= MAX_HEADER_ATTEMPTS; attempt++) {
+            boolean useProviderConstraints = attempt == 1 && (jsonMode || disableThinking);
+            try {
+                List<String> proposed = parseHeaders(nvidiaChatCompletionClient.complete(
+                        buildRequest(layout, deterministicHeaders, attempt, useProviderConstraints),
+                        "header inference"));
+                if (!proposed.isEmpty()) {
+                    return proposed;
+                }
+                LOGGER.warn("Header inference attempt {} returned no usable headers", attempt);
+            } catch (DocumentProcessingException | ExternalAiServiceException exception) {
+                LOGGER.warn("Header inference attempt {} failed: {}", attempt, exception.getMessage());
             }
-            LOGGER.warn("Header inference returned no usable headers; using the headers read from the layout");
-        } catch (DocumentProcessingException | ExternalAiServiceException exception) {
-            LOGGER.warn("Header inference failed ({}); using the headers read from the layout",
-                    exception.getMessage());
+        }
+
+        if (deterministicHeaders.isEmpty()) {
+            LOGGER.warn("Header inference produced nothing after {} attempts and the layout states no"
+                    + " headers of its own - the document will be written as raw extracted fields",
+                    MAX_HEADER_ATTEMPTS);
+        } else {
+            LOGGER.info("Header inference produced nothing; using the {} headers read from the layout",
+                    deterministicHeaders.size());
         }
 
         return deterministicHeaders;
     }
 
-    private ObjectNode buildRequest(DocumentLayout layout, List<String> deterministicHeaders) {
+    private ObjectNode buildRequest(DocumentLayout layout,
+                                    List<String> deterministicHeaders,
+                                    int attempt,
+                                    boolean useProviderConstraints) {
         ObjectNode document = objectMapper.createObjectNode();
         ArrayNode regions = document.putArray("regions");
 
@@ -161,15 +220,40 @@ public class NemotronHeaderInferenceService implements HeaderInferenceService {
             deterministicHeaders.forEach(candidates::add);
         }
 
+        ArrayNode messages = objectMapper.createArrayNode()
+                .add(objectMapper.createObjectNode().put("role", "system").put("content", SYSTEM_PROMPT))
+                .add(objectMapper.createObjectNode().put("role", "user").put("content", document.toString()));
+
+        if (attempt > 1) {
+            messages.add(objectMapper.createObjectNode()
+                    .put("role", "user")
+                    .put("content", STRICT_JSON_REMINDER));
+        }
+
         ObjectNode request = objectMapper.createObjectNode();
         request.put("model", mappingModel);
-        request.set("messages", objectMapper.createArrayNode()
-                .add(objectMapper.createObjectNode().put("role", "system").put("content", SYSTEM_PROMPT))
-                .add(objectMapper.createObjectNode().put("role", "user").put("content", document.toString())));
+        request.set("messages", messages);
         request.put("temperature", 0);
-        request.put("max_tokens", maxTokens);
-        request.set("response_format", objectMapper.createObjectNode().put("type", "json_object"));
-        request.set("chat_template_kwargs", objectMapper.createObjectNode().put("thinking", false));
+        // Temperature is 0, so a retry differs only by the reminder, a larger budget, and the
+        // dropped constraints - which between them is what recovers a truncated response.
+        request.put("max_tokens", maxTokens * attempt);
+
+        if (useProviderConstraints) {
+            if (jsonMode) {
+                // Constrained decoding: the endpoint will not let the model emit anything but a
+                // JSON object, removing prose and reasoning traces at the source.
+                request.set("response_format",
+                        objectMapper.createObjectNode().put("type", "json_object"));
+            }
+            if (disableThinking) {
+                // A reasoning model spends its output budget thinking before answering, which is
+                // what truncates the JSON. The prompt's /no_think token only works on some
+                // Nemotron builds; this is the chat-template level switch.
+                request.set("chat_template_kwargs",
+                        objectMapper.createObjectNode().put("thinking", false));
+            }
+        }
+
         return request;
     }
 

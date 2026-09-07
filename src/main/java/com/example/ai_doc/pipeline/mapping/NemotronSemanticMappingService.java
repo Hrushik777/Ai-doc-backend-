@@ -201,6 +201,13 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
 
     private static final Pattern WHITESPACE_RUN = Pattern.compile("\s+");
 
+    /**
+     * At or below this length, a value must occur as a whole token in its source field rather
+     * than anywhere inside it. Three characters covers the cases that match by accident -
+     * single digits, small numbers, two-letter codes - without touching real values.
+     */
+    private static final int SHORT_VALUE_LENGTH = 3;
+
     private static final String TRUNCATED_RESPONSE_MESSAGE =
             "Semantic mapping model ran out of output tokens before completing its JSON object"
                     + " - raise nvidia.mapping.max-tokens, or use a mapping model that does not"
@@ -553,8 +560,38 @@ public class NemotronSemanticMappingService implements SemanticMappingService {
         if (needle.isEmpty()) {
             return false;
         }
-        return comparable(source.value()).contains(needle)
-                || comparable(source.rawText()).contains(needle);
+        return occursAsAValue(source.value(), needle) || occursAsAValue(source.rawText(), needle);
+    }
+
+    /**
+     * Plain containment is grounding for a value of any length worth calling one, but not for
+     * a short one: "4" sits inside "2024", "no" inside "another", and "5" inside every date on
+     * the page. Those hits are coincidence, and accepting them lets exactly the fabricated
+     * value this check exists to reject slip through with a source field attached.
+     *
+     * <p>So a short value has to stand as its own token. A longer one does not, because it may
+     * legitimately be a fragment of a larger cell - a name inside a heading, a figure inside a
+     * sentence - and the odds of matching by accident have gone.
+     */
+    private boolean occursAsAValue(String sourceText, String needle) {
+        String haystack = comparable(sourceText);
+        if (!haystack.contains(needle)) {
+            return false;
+        }
+        if (needle.length() > SHORT_VALUE_LENGTH) {
+            return true;
+        }
+
+        for (int at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+            boolean startsCleanly = at == 0 || !Character.isLetterOrDigit(haystack.charAt(at - 1));
+            int after = at + needle.length();
+            boolean endsCleanly = after >= haystack.length()
+                    || !Character.isLetterOrDigit(haystack.charAt(after));
+            if (startsCleanly && endsCleanly) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String comparable(String text) {

@@ -27,6 +27,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 
 /**
@@ -56,6 +61,7 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
     private final PdfDocumentRenderer pdfDocumentRenderer;
     private final String parseModel;
     private final int maxTokens;
+    private final int parseConcurrency;
     private final ParsedDocumentFlattener parsedDocumentFlattener;
 
     public NemotronDocumentUnderstandingService(NvidiaChatCompletionClient nvidiaChatCompletionClient,
@@ -63,9 +69,13 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
                                                 PdfDocumentRenderer pdfDocumentRenderer,
                                                 ParsedDocumentFlattener parsedDocumentFlattener,
                                                 @Value("${nvidia.parse.model:nvidia/nemotron-parse}") String parseModel,
-                                                @Value("${nvidia.parse.max-tokens:4096}") int maxTokens) {
+                                                @Value("${nvidia.parse.max-tokens:4096}") int maxTokens,
+                                                @Value("${nvidia.parse.concurrency:4}") int parseConcurrency) {
         if (maxTokens <= 0) {
             throw new IllegalArgumentException("nvidia.parse.max-tokens must be greater than 0");
+        }
+        if (parseConcurrency <= 0) {
+            throw new IllegalArgumentException("nvidia.parse.concurrency must be greater than 0");
         }
         this.nvidiaChatCompletionClient = nvidiaChatCompletionClient;
         this.objectMapper = objectMapper;
@@ -73,24 +83,19 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
         this.parsedDocumentFlattener = parsedDocumentFlattener;
         this.parseModel = parseModel;
         this.maxTokens = maxTokens;
+        this.parseConcurrency = parseConcurrency;
     }
 
     @Override
     public ParsedDocument parse(MultipartFile document) {
+        List<PageResult> pageResults = parsePages(document);
+
         List<DocumentElement> elements = new ArrayList<>();
-        List<PageGeometry> pages = new ArrayList<>();
-
-        // Pages are rendered and consumed one at a time. Materializing every page bitmap up
-        // front held the whole document in memory (megabytes per page at render DPI) for the
-        // entire sequence of Nemotron calls; now only the in-flight page is alive.
-        forEachPage(document, page -> {
-            LOGGER.debug("Submitting document page {} to Nemotron Parse", page.pageNumber());
-            JsonNode response = nvidiaChatCompletionClient.complete(buildRequest(page), "Nemotron Parse");
-
-            List<DocumentElement> pageElements = parseNemotronResponse(response, page.pageNumber());
-            elements.addAll(pageElements);
-            pages.add(pageGeometryFor(page, pageElements));
-        });
+        List<PageGeometry> pages = new ArrayList<>(pageResults.size());
+        for (PageResult pageResult : pageResults) {
+            elements.addAll(pageResult.elements());
+            pages.add(pageResult.geometry());
+        }
 
         if (elements.isEmpty()) {
             // Downstream this surfaces as "nothing matched", which points the investigation at
@@ -101,6 +106,87 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
         }
 
         return new ParsedDocument(elements, pages);
+    }
+
+    /** One page's outcome, kept together so results can be reassembled in page order. */
+    private record PageResult(List<DocumentElement> elements, PageGeometry geometry) {
+    }
+
+    /**
+     * Renders each page and parses it, overlapping the calls.
+     *
+     * <p>Rendering stays on the calling thread: a PDFBox {@code PDDocument} is not safe to
+     * share, and rasterizing is cheap next to the call that follows it. What overlaps is the
+     * waiting - a page spends seconds inside Nemotron and microseconds in our own code, so a
+     * sequential loop over a ten-page document was ten round trips end to end.
+     *
+     * <p>{@code nvidia.parse.concurrency} bounds how many pages are in flight, which also
+     * bounds memory: a rendered page is held as its encoded PNG plus the base64 copy in the
+     * request, so an unbounded renderer racing ahead of the network would accumulate the whole
+     * document again - the thing streaming pages one at a time was introduced to prevent.
+     */
+    private List<PageResult> parsePages(MultipartFile document) {
+        if (parseConcurrency == 1) {
+            List<PageResult> results = new ArrayList<>();
+            forEachPage(document, page -> results.add(parsePage(page)));
+            return results;
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(parseConcurrency);
+        Semaphore inFlight = new Semaphore(parseConcurrency);
+        // Appended on the rendering thread only, so page order is submission order.
+        List<Future<PageResult>> futures = new ArrayList<>();
+
+        try {
+            forEachPage(document, page -> {
+                inFlight.acquireUninterruptibly();
+                futures.add(executor.submit(() -> {
+                    try {
+                        return parsePage(page);
+                    } finally {
+                        inFlight.release();
+                    }
+                }));
+            });
+            return collectInPageOrder(futures);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private PageResult parsePage(DocumentPageImage page) {
+        LOGGER.debug("Submitting document page {} to Nemotron Parse", page.pageNumber());
+        JsonNode response = nvidiaChatCompletionClient.complete(buildRequest(page), "Nemotron Parse");
+
+        List<DocumentElement> pageElements = parseNemotronResponse(response, page.pageNumber());
+        return new PageResult(pageElements, pageGeometryFor(page, pageElements));
+    }
+
+    /**
+     * Waits on the pages in order, so a concurrent run produces byte-identical output to a
+     * sequential one. Elements are consumed downstream by position, and a document whose
+     * rows arrived in completion order rather than page order would be quietly scrambled.
+     */
+    private List<PageResult> collectInPageOrder(List<Future<PageResult>> futures) {
+        List<PageResult> results = new ArrayList<>(futures.size());
+        for (Future<PageResult> future : futures) {
+            try {
+                results.add(future.get());
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new DocumentProcessingException("Interrupted while parsing document pages", exception);
+            } catch (ExecutionException exception) {
+                Throwable cause = exception.getCause();
+                // The pipeline's own exception types carry meaning the handler acts on - an
+                // unreachable model is not the same as an unreadable document - so they are
+                // rethrown as they are rather than collapsed into one generic failure.
+                if (cause instanceof RuntimeException runtimeCause) {
+                    throw runtimeCause;
+                }
+                throw new DocumentProcessingException("Failed to parse a document page", cause);
+            }
+        }
+        return results;
     }
 
     @Override
@@ -196,6 +282,11 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
         ObjectNode request = objectMapper.createObjectNode();
         request.put("model", parseModel);
         request.set("messages", objectMapper.createArrayNode().add(message));
+        // Greedy decoding, as the mapping and header calls already use. This is the most
+        // upstream stage - every element every later stage reasons about is produced here -
+        // so sampling at the endpoint's default made the same page read differently between
+        // runs, and made a wrong extraction impossible to reproduce while investigating it.
+        request.put("temperature", 0);
         // A dense page - a long table rendered as LaTeX - overruns a small budget and comes
         // back truncated, which reads downstream as a page that simply had less on it.
         request.put("max_tokens", maxTokens);

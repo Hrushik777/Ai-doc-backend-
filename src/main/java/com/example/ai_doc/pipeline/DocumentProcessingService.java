@@ -675,7 +675,7 @@ public class DocumentProcessingService {
         }
 
         ExcelService.SynthesizedTemplate synthesized =
-                excelService.createWorkbook(RawFieldRecordBuilder.HEADERS);
+                excelService.createWorkbook(rawFieldRecordBuilder.headers());
         return new PreparedWorkbook(
                 synthesized.workbook(), synthesized.templateInfo(), parsed, layout, true);
     }
