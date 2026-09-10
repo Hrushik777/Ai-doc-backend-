@@ -26,6 +26,21 @@ public class GlobalExceptionHandler {
 
     // ------------------------------------------------------- the caller can fix these
 
+    /**
+     * A Google ID token that did not verify.
+     *
+     * <p>The reason is logged and not returned. Which check failed - signature, audience, expiry,
+     * allowlist - tells whoever is probing exactly how close they are, and a caller acting in good
+     * faith only needs to know that signing in again is the answer.
+     */
+    @ExceptionHandler(com.example.ai_doc.auth.GoogleTokenVerificationException.class)
+    public ResponseEntity<ApiErrorResponse> handleGoogleTokenRejected(
+            com.example.ai_doc.auth.GoogleTokenVerificationException exception) {
+        LOGGER.warn("Google sign-in rejected: {}", exception.getMessage());
+        return respond(HttpStatus.UNAUTHORIZED, "SIGN_IN_FAILED",
+                "Could not verify that Google sign-in. Please try signing in again.");
+    }
+
     @ExceptionHandler(EmptyFileException.class)
     public ResponseEntity<ApiErrorResponse> handleEmptyFile(EmptyFileException exception) {
         return badRequest("EMPTY_FILE", exception.getMessage());
