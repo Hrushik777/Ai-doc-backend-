@@ -174,9 +174,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/GlobalExceptionHandler.java": {
-    "mtime": 1789214318.1028357,
-    "seen": 1789214834.2901168,
-    "ast_hash": "e3b4852552362928a53d5b9062c4f6f7",
+    "mtime": 1789017595.1210752,
+    "seen": 1789018576.4979374,
+    "ast_hash": "d9eb41146c9de8fdebf6a195f316d4d8",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/api/error/InvalidExcelTemplateException.java": {
@@ -432,9 +432,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/DocumentProcessingService.java": {
-    "mtime": 1789214742.7786534,
-    "seen": 1789214834.2901168,
-    "ast_hash": "fa385717d1e0794af4f95027e660cbfe",
+    "mtime": 1788582115.3503058,
+    "seen": 1788582382.9642303,
+    "ast_hash": "8191882b70f4644790ea72080d0038c7",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/pipeline/document/DocumentService.java": {
@@ -828,9 +828,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/auth/GoogleTokenVerifier.java": {
-    "mtime": 1789038543.452772,
-    "seen": 1789214834.2901168,
-    "ast_hash": "8655137651fa64358c6b40c864996387",
+    "mtime": 1789017795.2896254,
+    "seen": 1789018576.4979374,
+    "ast_hash": "2876ed868aa2be5ed01e8c5dc3747f6d",
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/auth/SessionTokenIssuer.java": {
@@ -846,27 +846,21 @@
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/api/SecurityFilterChainTest.java": {
-    "mtime": 1789214363.7986457,
-    "seen": 1789214834.2901168,
-    "ast_hash": "677001ee06d58d03ccde090c6525e4a7",
+    "mtime": 1789018439.6917174,
+    "seen": 1789018576.4979374,
+    "ast_hash": "c539491d222184d37445084fce734237",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/auth/GoogleTokenVerifierTest.java": {
-    "mtime": 1789038543.452772,
-    "seen": 1789214834.2901168,
-    "ast_hash": "23814ed2ef2dd9ca4bc3be03075dc5fe",
+    "mtime": 1789017823.001839,
+    "seen": 1789018576.4979374,
+    "ast_hash": "c3b14ef8eba02085a80b053c6b464190",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/auth/SessionTokenTest.java": {
     "mtime": 1789017851.918715,
     "seen": 1789018576.4979374,
     "ast_hash": "31b6f053aa2f4533cb133739dc3c7279",
-    "semantic_hash": ""
-  },
-  "src/test/java/com/example/ai_doc/pipeline/BatchConcurrencyTest.java": {
-    "mtime": 1789214705.830652,
-    "seen": 1789214834.2901168,
-    "ast_hash": "71f50cc56287dceea8015954e70eba86",
     "semantic_hash": ""
   }
 }

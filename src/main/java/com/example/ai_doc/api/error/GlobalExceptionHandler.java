@@ -7,8 +7,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Turns the pipeline's exceptions into HTTP responses of one consistent shape.
@@ -105,6 +108,28 @@ public class GlobalExceptionHandler {
         LOGGER.error("Document processing failed", exception);
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, "PROCESSING_FAILED",
                 "The document could not be processed");
+    }
+
+    /**
+     * A route that does not exist, and a method that route does not accept.
+     *
+     * <p>Both reach the catch-all below otherwise, where they are reported as 500s. A typo in a
+     * URL then looks identical to the server falling over: monitoring counts it as an outage, and
+     * anyone debugging goes looking for a crash that never happened. Spring raises these as
+     * ordinary exceptions, so they have to be claimed explicitly.
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ApiErrorResponse> handleNoSuchRoute(Exception exception) {
+        LOGGER.debug("No handler for request: {}", exception.getMessage());
+        return respond(HttpStatus.NOT_FOUND, "NOT_FOUND", "No such endpoint");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodNotAllowed(
+            HttpRequestMethodNotSupportedException exception) {
+        LOGGER.debug("Method not supported: {}", exception.getMessage());
+        return respond(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+                "That method is not supported by this endpoint");
     }
 
     /**

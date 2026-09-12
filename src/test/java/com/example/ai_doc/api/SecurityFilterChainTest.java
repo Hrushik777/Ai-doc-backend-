@@ -118,12 +118,23 @@ class SecurityFilterChainTest {
                 .andExpect(jsonPath("$.code").value("SIGN_IN_FAILED"));
     }
 
-    /** Anything not explicitly closed stays open, so the landing page keeps working signed out. */
+    /**
+     * Anything not explicitly closed stays open, so the landing page keeps working signed out.
+     *
+     * <p>Asserts 404 rather than merely "not 401". An unknown route used to reach the catch-all
+     * handler and come back as a 500, which makes a mistyped URL indistinguishable from the
+     * server falling over - monitoring counts it as an outage and debugging starts by hunting a
+     * crash that never happened.
+     */
     @Test
-    void unmatchedPathsAreNotBehindTheGate() throws Exception {
-        mockMvc.perform(get("/"))
-                .andExpect(status().is(org.hamcrest.Matchers.not(401)))
-                .andExpect(status().is(org.hamcrest.Matchers.not(403)));
+    void anUnknownPathIsNotFoundRatherThanBlockedOrBroken() throws Exception {
+        mockMvc.perform(get("/no-such-page")).andExpect(status().isNotFound());
+    }
+
+    /** A known route called with the wrong method is a 405, not a 500 and not a 401. */
+    @Test
+    void aKnownRouteWithTheWrongMethodSaysMethodNotAllowed() throws Exception {
+        mockMvc.perform(get("/api/auth/session")).andExpect(status().isMethodNotAllowed());
     }
 
     // ------------------------------------------------------------------- helpers

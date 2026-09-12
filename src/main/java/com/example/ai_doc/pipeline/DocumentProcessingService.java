@@ -58,6 +58,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.Objects;
 import java.util.Set;
 
@@ -82,6 +86,7 @@ public class DocumentProcessingService {
     private final RawFieldRecordBuilder rawFieldRecordBuilder;
     private final NoTemplateMode noTemplateMode;
     private final ExcelWriteMode excelWriteMode;
+    private final int batchConcurrency;
 
     @Autowired
     public DocumentProcessingService(DocumentFileValidator documentFileValidator,
@@ -98,7 +103,8 @@ public class DocumentProcessingService {
                                      @Value("${app.no-template.mode:INFERRED_HEADERS}")
                                      NoTemplateMode noTemplateMode,
                                      @Value("${app.excel.write-mode:FILL_THEN_APPEND}")
-                                     ExcelWriteMode excelWriteMode) {
+                                     ExcelWriteMode excelWriteMode,
+                                     @Value("${app.batch.concurrency:3}") int batchConcurrency) {
         this.documentFileValidator = documentFileValidator;
         this.excelService = excelService;
         this.documentUnderstandingService = documentUnderstandingService;
@@ -112,6 +118,10 @@ public class DocumentProcessingService {
         this.rawFieldRecordBuilder = rawFieldRecordBuilder;
         this.noTemplateMode = noTemplateMode;
         this.excelWriteMode = excelWriteMode;
+        if (batchConcurrency <= 0) {
+            throw new IllegalArgumentException("app.batch.concurrency must be greater than 0");
+        }
+        this.batchConcurrency = batchConcurrency;
     }
 
     /**
@@ -128,7 +138,7 @@ public class DocumentProcessingService {
                 defaultLayoutAnalyzer(), new LayoutRecordMapper(headerFieldMapper),
                 new ParsedDocumentFlattener(), new LayoutHeaderInferrer()::infer,
                 new RawFieldRecordBuilder(), NoTemplateMode.INFERRED_HEADERS,
-                ExcelWriteMode.FILL_THEN_APPEND);
+                ExcelWriteMode.FILL_THEN_APPEND, 3);
     }
 
     /** The layout stage has no configuration, so the legacy constructor can build its own. */
@@ -444,17 +454,21 @@ public class DocumentProcessingService {
             int gapFillBoundary = excelService.lastDataRow(
                     workbook.getSheet(templateInfo.sheetName()), templateInfo);
 
+            // Reading the documents and writing the workbook are separated deliberately.
+            //
+            // Reading is where a batch spends its time - every document is several seconds
+            // inside Nemotron - and no document's reading depends on another's, so they overlap.
+            // Writing is the opposite: POI's Workbook is not safe to share, and each write
+            // locates the sheet's current last row to decide where the next one goes, so the
+            // writes must happen one at a time and in the order the caller sent them.
+            List<DocumentOutcome> outcomes =
+                    readDocumentsConcurrently(documents, prepared, templateInfo);
+
             for (int documentIndex = 0; documentIndex < documents.size(); documentIndex++) {
-                MultipartFile document = documents.get(documentIndex);
-                String filename = document.getOriginalFilename();
+                String filename = documents.get(documentIndex).getOriginalFilename();
 
                 try {
-                    documentFileValidator.validate(document);
-                    // The first document may already have been parsed to infer the headers;
-                    // reusing that parse keeps the batch to one model call per document.
-                    DocumentMapping mapping = documentIndex == 0
-                            ? mapDocument(document, prepared)
-                            : computeRecordsForDocument(document, templateInfo);
+                    DocumentMapping mapping = outcomes.get(documentIndex).orThrow();
 
                     if (mapping.isEmpty()) {
                         throw new NoExcelMappingsException(mapping.describeEmptyOutcome());
@@ -482,6 +496,104 @@ public class DocumentProcessingService {
             return new BatchProcessedExcelFile(COMPLETED_FILENAME, excelService.serialize(workbook), results);
         } catch (IOException exception) {
             throw new DocumentProcessingException("Failed to process document batch", exception);
+        }
+    }
+
+    /**
+     * Reads every document in the batch, overlapping the work.
+     *
+     * <p>Each task is self-contained: validation, parsing and mapping for one document, against
+     * a template that was settled before any of this started. Nothing here touches the workbook.
+     *
+     * <p>A document that fails does not fail the batch. The exception is carried in its future
+     * and rethrown when that document's turn to be written comes round, so it lands in the same
+     * per-document catch that has always written the failure row - in position, with the
+     * documents either side of it unaffected.
+     *
+     * <p>{@code app.batch.concurrency} multiplies with {@code nvidia.parse.concurrency}: three
+     * documents each with four pages in flight is twelve requests at once. Raise either only
+     * with the upstream rate limit in view.
+     */
+    private List<DocumentOutcome> readDocumentsConcurrently(List<MultipartFile> documents,
+                                                            PreparedWorkbook prepared,
+                                                            ExcelTemplateInfo templateInfo) {
+        if (batchConcurrency == 1 || documents.size() == 1) {
+            List<DocumentOutcome> outcomes = new ArrayList<>(documents.size());
+            for (int index = 0; index < documents.size(); index++) {
+                outcomes.add(capture(documents, prepared, templateInfo, index));
+            }
+            return outcomes;
+        }
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(Math.min(batchConcurrency, documents.size()));
+        try {
+            List<Future<DocumentOutcome>> pending = new ArrayList<>(documents.size());
+            for (int index = 0; index < documents.size(); index++) {
+                int documentIndex = index;
+                pending.add(executor.submit(
+                        () -> capture(documents, prepared, templateInfo, documentIndex)));
+            }
+
+            List<DocumentOutcome> outcomes = new ArrayList<>(pending.size());
+            for (Future<DocumentOutcome> future : pending) {
+                outcomes.add(await(future));
+            }
+            return outcomes;
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    /**
+     * Runs one document's pipeline and keeps whatever came of it.
+     *
+     * <p>A failure is stored rather than thrown. Thrown here it would abandon the batch; stored,
+     * it is rethrown when that document's turn to be written arrives, landing in the same
+     * per-document catch that has always written the failure row - in position, with the
+     * documents either side of it unaffected.
+     */
+    private DocumentOutcome capture(List<MultipartFile> documents,
+                                    PreparedWorkbook prepared,
+                                    ExcelTemplateInfo templateInfo,
+                                    int documentIndex) {
+        MultipartFile document = documents.get(documentIndex);
+        try {
+            documentFileValidator.validate(document);
+            // The first document may already have been parsed to infer the headers; reusing
+            // that parse keeps the batch to one model call per document.
+            DocumentMapping mapping = documentIndex == 0
+                    ? mapDocument(document, prepared)
+                    : computeRecordsForDocument(document, templateInfo);
+            return new DocumentOutcome(mapping, null);
+        } catch (RuntimeException exception) {
+            return new DocumentOutcome(null, exception);
+        }
+    }
+
+    private DocumentOutcome await(Future<DocumentOutcome> future) {
+        try {
+            return future.get();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new DocumentProcessingException("Interrupted while reading the batch", exception);
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof RuntimeException runtimeCause) {
+                throw runtimeCause;
+            }
+            throw new DocumentProcessingException("Failed to read a document in the batch", cause);
+        }
+    }
+
+    /** One document's reading: a mapping, or the failure that stopped it. Exactly one is set. */
+    private record DocumentOutcome(DocumentMapping mapping, RuntimeException failure) {
+
+        DocumentMapping orThrow() {
+            if (failure != null) {
+                throw failure;
+            }
+            return mapping;
         }
     }
 
