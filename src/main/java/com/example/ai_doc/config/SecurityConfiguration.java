@@ -2,6 +2,7 @@ package com.example.ai_doc.config;
 
 import com.example.ai_doc.api.dto.ApiErrorResponse;
 import com.example.ai_doc.auth.SessionTokenIssuer;
+import com.example.ai_doc.auth.SignedInOrWithinFreeAllowance;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,9 +28,10 @@ import java.nio.charset.StandardCharsets;
 /**
  * Who may run a document through the pipeline.
  *
- * <p>Only the three processing endpoints are closed. Everything the landing page needs stays
- * open, because the point of the gate is to ask for an account at the moment work is about to be
- * spent - not to make a stranger sign in before they can see what the product does.
+ * <p>Only the three processing endpoints are guarded, and not by a flat sign-in requirement: a
+ * visitor gets {@code app.auth.free-attempts} runs first, and is asked for an account when those
+ * are gone. Everything the landing page needs stays open, because the point is to ask for an
+ * account once someone is clearly using the thing - not before a stranger can see what it does.
  *
  * <p>Stateless by construction: the bearer token is the whole credential, so there is no session
  * to keep and nothing to lose when the instance sleeps and restarts.
@@ -40,6 +42,7 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtDecoder sessionTokenDecoder,
+                                                   SignedInOrWithinFreeAllowance processingAccess,
                                                    ObjectMapper objectMapper) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
@@ -52,9 +55,14 @@ public class SecurityConfiguration {
                         // Preflight carries no Authorization header by design. Authenticate it and
                         // every cross-origin call fails before the real request is ever sent.
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // Not simply authenticated: a visitor gets a few runs before being asked
+                        // for an account. Requiring one up front is a poor trade for a public
+                        // demo, and it deadlocked here - signing in posts to this service, so a
+                        // sleeping instance failed the sign-in, and the sign-in was the only
+                        // request that would have woken it.
                         .requestMatchers(HttpMethod.POST, "/api/documents/process",
                                 "/api/documents/process/explain",
-                                "/api/documents/process/batch").authenticated()
+                                "/api/documents/process/batch").access(processingAccess)
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.decoder(sessionTokenDecoder))
@@ -90,7 +98,7 @@ public class SecurityConfiguration {
     private AuthenticationEntryPoint unauthenticatedHandler(ObjectMapper objectMapper) {
         return (request, response, exception) -> write(response, objectMapper,
                 HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED",
-                "Sign in to process documents");
+                "Your free runs are used up - sign in to keep processing documents");
     }
 
     private AccessDeniedHandler forbiddenHandler(ObjectMapper objectMapper) {

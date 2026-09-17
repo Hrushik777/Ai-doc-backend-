@@ -840,9 +840,9 @@
     "semantic_hash": ""
   },
   "src/main/java/com/example/ai_doc/config/SecurityConfiguration.java": {
-    "mtime": 1789625907.3847878,
-    "seen": 1789626468.730135,
-    "ast_hash": "d71ee3014b913ce990c73b677c9736af",
+    "mtime": 1789018052.6276994,
+    "seen": 1789018576.4979374,
+    "ast_hash": "fe3363ea542ae6197e7d2d12fa2d9916",
     "semantic_hash": ""
   },
   "src/test/java/com/example/ai_doc/api/SecurityFilterChainTest.java": {
@@ -867,36 +867,6 @@
     "mtime": 1789214705.830652,
     "seen": 1789214834.2901168,
     "ast_hash": "71f50cc56287dceea8015954e70eba86",
-    "semantic_hash": ""
-  },
-  "src/main/java/com/example/ai_doc/api/HealthController.java": {
-    "mtime": 1789625915.749229,
-    "seen": 1789626468.730135,
-    "ast_hash": "fdc6f246df13fc3c874ee23c586f7ce6",
-    "semantic_hash": ""
-  },
-  "src/main/java/com/example/ai_doc/api/dto/ServiceStatus.java": {
-    "mtime": 1789625921.5163882,
-    "seen": 1789626468.730135,
-    "ast_hash": "c4480818cdcaa7e82d9bc42abc7bddd5",
-    "semantic_hash": ""
-  },
-  "src/main/java/com/example/ai_doc/auth/FreeAttemptAllowance.java": {
-    "mtime": 1789625868.2927947,
-    "seen": 1789626468.730135,
-    "ast_hash": "d6e5a3dbfbc230485ee11dd02fc9960c",
-    "semantic_hash": ""
-  },
-  "src/main/java/com/example/ai_doc/auth/SignedInOrWithinFreeAllowance.java": {
-    "mtime": 1789625881.089024,
-    "seen": 1789626468.730135,
-    "ast_hash": "9667d1c949b8c416b6ed739bc6b07eee",
-    "semantic_hash": ""
-  },
-  "src/test/java/com/example/ai_doc/api/FreeAttemptAllowanceTest.java": {
-    "mtime": 1789626078.7031953,
-    "seen": 1789626468.730135,
-    "ast_hash": "0a527fa264afc054e137a492245c4ae0",
     "semantic_hash": ""
   }
 }
