@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -229,6 +230,12 @@ public class DocumentProcessingService {
 
         documentFileValidator.validate(document);
 
+        // The preview depends on nothing but the upload, so it renders while the pipeline
+        // waits on Nemotron instead of after it. Done last, it added a full second render pass
+        // of every page to the end of the request.
+        CompletableFuture<List<String>> pageImages =
+                CompletableFuture.supplyAsync(() -> renderPageImages(document));
+
         PreparedWorkbook prepared = prepareWorkbook(document, template);
 
         try (Workbook workbook = prepared.workbook()) {
@@ -248,7 +255,7 @@ public class DocumentProcessingService {
                     templateInfo.headers(),
                     toExplainedFields(mapping.extractedFields()),
                     toExplainedMappings(mapping),
-                    renderPageImages(document));
+                    pageImages.join());
         } catch (IOException exception) {
             throw new DocumentProcessingException("Failed to process document", exception);
         }

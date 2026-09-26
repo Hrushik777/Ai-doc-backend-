@@ -28,13 +28,16 @@ public class NvidiaChatCompletionClient {
 
     public JsonNode complete(JsonNode requestBody, String operationName) {
         try {
-            String responseBody = restClient.post()
+            // Bytes end to end. A parse request carries a whole page as base64, several MB of
+            // it, and going through a String built that as UTF-16 and then encoded it again to
+            // UTF-8 for the wire - two extra full copies of the page per request.
+            byte[] responseBody = restClient.post()
                     .uri("/chat/completions")
-                    .body(objectMapper.writeValueAsString(requestBody))
+                    .body(objectMapper.writeValueAsBytes(requestBody))
                     .retrieve()
-                    .body(String.class);
+                    .body(byte[].class);
 
-            if (responseBody == null || responseBody.isBlank()) {
+            if (responseBody == null || isBlank(responseBody)) {
                 throw new ExternalAiServiceException("NVIDIA returned an empty " + operationName + " response");
             }
             return objectMapper.readTree(responseBody);
@@ -42,5 +45,14 @@ public class NvidiaChatCompletionClient {
             LOGGER.warn("NVIDIA {} request failed", operationName, exception);
             throw new ExternalAiServiceException("NVIDIA " + operationName + " request failed", exception);
         }
+    }
+
+    private static boolean isBlank(byte[] body) {
+        for (byte b : body) {
+            if (!Character.isWhitespace(b)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

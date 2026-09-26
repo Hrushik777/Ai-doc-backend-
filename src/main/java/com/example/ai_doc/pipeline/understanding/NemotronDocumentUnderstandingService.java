@@ -21,11 +21,13 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -234,8 +236,8 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
 
             if (MediaType.IMAGE_PNG_VALUE.equals(contentType) || MediaType.IMAGE_JPEG_VALUE.equals(contentType)) {
                 byte[] content = document.getBytes();
-                pageConsumer.accept(new DocumentPageImage(1, contentType, content,
-                        imageWidth(content), imageHeight(content)));
+                int[] size = imageSize(content);
+                pageConsumer.accept(new DocumentPageImage(1, contentType, content, size[0], size[1]));
                 return;
             }
         } catch (IOException exception) {
@@ -246,25 +248,30 @@ public class NemotronDocumentUnderstandingService implements DocumentUnderstandi
                 "Nemotron document understanding currently supports PDF, PNG, and JPEG documents");
     }
 
-    private int imageWidth(byte[] content) {
-        BufferedImage image = readImage(content);
-        return image == null ? 0 : image.getWidth();
-    }
-
-    private int imageHeight(byte[] content) {
-        BufferedImage image = readImage(content);
-        return image == null ? 0 : image.getHeight();
-    }
-
-    private BufferedImage readImage(byte[] content) {
-        try {
-            return ImageIO.read(new ByteArrayInputStream(content));
+    /**
+     * Reads the pixel size from the image header alone. Only the dimensions are needed here -
+     * the bytes go to the model untouched - and fully decoding a phone photo to learn two
+     * numbers cost a full-resolution bitmap and a noticeable slice of the request. It used to
+     * happen twice, once per dimension.
+     */
+    private int[] imageSize(byte[] content) {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
+            Iterator<ImageReader> readers = input == null ? null : ImageIO.getImageReaders(input);
+            if (readers != null && readers.hasNext()) {
+                ImageReader reader = readers.next();
+                try {
+                    reader.setInput(input, true, true);
+                    return new int[] {reader.getWidth(0), reader.getHeight(0)};
+                } finally {
+                    reader.dispose();
+                }
+            }
         } catch (IOException | RuntimeException exception) {
             // An unreadable header only costs us the pixel dimensions; the coordinate-space
             // detection falls back to the observed extent, so parsing still proceeds.
             LOGGER.debug("Could not read uploaded image dimensions: {}", exception.getMessage());
-            return null;
         }
+        return new int[] {0, 0};
     }
 
     private ObjectNode buildRequest(DocumentPageImage page) {

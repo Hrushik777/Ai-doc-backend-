@@ -1,25 +1,25 @@
-# Graph Report - ai-doc  (2026-09-17)
+# Graph Report - ai-doc  (2026-09-26)
 
 ## Corpus Check
-- 149 files · ~59,275 words
+- 149 files · ~59,469 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 971 nodes · 3127 edges · 56 communities (47 shown, 9 thin omitted)
+- 970 nodes · 3122 edges · 73 communities (59 shown, 14 thin omitted)
 - Extraction: 89% EXTRACTED · 11% INFERRED · 0% AMBIGUOUS · INFERRED: 330 edges (avg confidence: 0.81)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `cd5e853d`
+- Built from commit: `5221d01c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- NemotronDocumentUnderstandingService
+- NvidiaChatCompletionClient
 - DocumentProcessingService
 - org.springframework.http.ResponseEntity
 - ExtractedField
-- DocumentProcessingService.java
+- org.springframework.web.multipart.MultipartFile
 - Document
 - What You Must Do When Invoked
 - org.junit.jupiter.api.Test
@@ -39,19 +39,36 @@
 - CLAUDE.md
 - .claude/CLAUDE.md
 - extraction-spec.md
-- org.springframework.stereotype.Component
-- .parse
+- DocumentProcessingService.java
+- org.springframework.mock.web.MockMultipartFile
 - ExcelTemplateInfo
-- DocumentProcessingBenchmarkTest
-- LayoutRow
+- DocumentProcessingBenchmarkTest.java
+- DocumentLayout
 - LayoutRegion
 - ExtractedDocumentData
 - .analyze
-- DocumentFileValidator
-- DocumentLayout
-- DocumentElement
-- FreeAttemptAllowance
+- NemotronDocumentUnderstandingService
 - DocumentProcessingServiceTest.java
+- LayoutHeaderInferrer
+- DocumentElement
+- SemanticMapping
+- SecurityConfiguration.java
+- FreeAttemptAllowance
+- IndexedExtractedField
+- DocumentControllerTest.java
+- SessionTokenTest
+- SessionTokenIssuer
+- .mapLayout
+- GoogleTokenVerifier
+- BatchConcurrencyTest
+- NemotronParseConcurrencyTest
+- DocumentProcessingException
+- SignedInOrWithinFreeAllowance
+- CorsConfiguration
+- ExplainedMapping
+- NoExcelMappingsException
+- UnsupportedDocumentUnderstandingException
+- NoTemplateMode
 
 ## God Nodes (most connected - your core abstractions)
 1. `DocumentElement` - 58 edges
@@ -66,45 +83,45 @@
 10. `DocumentLayout` - 28 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `AuthController` --references--> `SessionTokenIssuer`  [EXTRACTED]
-  src/main/java/com/example/ai_doc/api/AuthController.java → src/main/java/com/example/ai_doc/auth/SessionTokenIssuer.java
+- `AuthController` --references--> `GoogleTokenVerifier`  [EXTRACTED]
+  src/main/java/com/example/ai_doc/api/AuthController.java → src/main/java/com/example/ai_doc/auth/GoogleTokenVerifier.java
 - `DocumentController` --references--> `DocumentProcessingService`  [EXTRACTED]
   src/main/java/com/example/ai_doc/api/DocumentController.java → src/main/java/com/example/ai_doc/pipeline/DocumentProcessingService.java
+- `HealthController` --references--> `FreeAttemptAllowance`  [EXTRACTED]
+  src/main/java/com/example/ai_doc/api/HealthController.java → src/main/java/com/example/ai_doc/auth/FreeAttemptAllowance.java
+- `ProcessExplanation` --references--> `ExplainedMapping`  [EXTRACTED]
+  src/main/java/com/example/ai_doc/api/dto/ProcessExplanation.java → src/main/java/com/example/ai_doc/api/dto/ExplainedMapping.java
 - `ProcessExplanation` --references--> `ExcelColumn`  [EXTRACTED]
   src/main/java/com/example/ai_doc/api/dto/ProcessExplanation.java → src/main/java/com/example/ai_doc/domain/excel/ExcelColumn.java
-- `ExtractedDocumentData` --references--> `ExtractedField`  [EXTRACTED]
-  src/main/java/com/example/ai_doc/domain/document/ExtractedDocumentData.java → src/main/java/com/example/ai_doc/domain/document/ExtractedField.java
-- `IndexedExtractedField` --references--> `ExtractedField`  [EXTRACTED]
-  src/main/java/com/example/ai_doc/domain/mapping/IndexedExtractedField.java → src/main/java/com/example/ai_doc/domain/document/ExtractedField.java
 
 ## Import Cycles
 - None detected.
 
-## Communities (56 total, 9 thin omitted)
+## Communities (73 total, 14 thin omitted)
 
-### Community 0 - "NemotronDocumentUnderstandingService"
-Cohesion: 0.05
-Nodes (28): java.awt.image.BufferedImage, org.apache.pdfbox.rendering.PDFRenderer, org.slf4j.Logger, org.springframework.stereotype.Service, org.springframework.web.client.RestClient, PDFRenderer, ExternalAiServiceException, UnsupportedDocumentUnderstandingException (+20 more)
+### Community 0 - "NvidiaChatCompletionClient"
+Cohesion: 0.17
+Nodes (8): org.slf4j.Logger, org.springframework.web.client.RestClient, ExternalAiServiceException, Override, NemotronHeaderInferenceService, NvidiaChatCompletionClient, tools.jackson.databind.node.ObjectNode, tools.jackson.databind.ObjectMapper
 
 ### Community 1 - "DocumentProcessingService"
-Cohesion: 0.13
-Nodes (8): org.springframework.web.multipart.MultipartFile, NoExcelMappingsException, ParsedDocument, DocumentMapping, DocumentOutcome, DocumentProcessingService, PreparedWorkbook, Override
+Cohesion: 0.19
+Nodes (5): ParsedDocument, DocumentMapping, DocumentOutcome, DocumentProcessingService, PreparedWorkbook
 
 ### Community 2 - "org.springframework.http.ResponseEntity"
-Cohesion: 0.07
-Nodes (31): HttpServletResponse, org.springframework.context.annotation.Bean, org.springframework.context.annotation.Configuration, org.springframework.http.HttpStatus, org.springframework.http.ResponseEntity, org.springframework.security.config.annotation.web.builders.HttpSecurity, org.springframework.security.oauth2.jwt.JwtDecoder, org.springframework.security.web.access.AccessDeniedHandler (+23 more)
+Cohesion: 0.17
+Nodes (12): org.springframework.http.ResponseEntity, org.springframework.web.bind.annotation.ExceptionHandler, org.springframework.web.bind.annotation.RestControllerAdvice, org.springframework.web.HttpRequestMethodNotSupportedException, org.springframework.web.multipart.MaxUploadSizeExceededException, org.springframework.web.multipart.support.MissingServletRequestPartException, org.springframework.web.servlet.NoHandlerFoundException, org.springframework.web.servlet.resource.NoResourceFoundException (+4 more)
 
 ### Community 3 - "ExtractedField"
-Cohesion: 0.14
+Cohesion: 0.16
 Nodes (7): ExtractedField, DeterministicMappingResult, MappingSource, DETERMINISTIC, SEMANTIC, STRUCTURAL, ResolvedFieldMapping
 
-### Community 4 - "DocumentProcessingService.java"
-Cohesion: 0.14
-Nodes (11): org.springframework.beans.factory.annotation.Autowired, ExplainedField, ExplainedMapping, ProcessExplanation, NoTemplateMode, INFERRED_HEADERS, RAW_FIELDS, HeaderInferenceService (+3 more)
+### Community 4 - "org.springframework.web.multipart.MultipartFile"
+Cohesion: 0.19
+Nodes (7): org.springframework.web.multipart.MultipartFile, DocumentController, PostMapping, RequestMapping, RestController, ExplainedField, ProcessExplanation
 
 ### Community 5 - "Document"
-Cohesion: 0.07
-Nodes (11): Entity, org.junit.jupiter.params.ParameterizedTest, org.junit.jupiter.params.provider.ValueSource, org.springframework.data.jpa.repository.JpaRepository, org.springframework.stereotype.Repository, Document, DocumentRepository, DocumentService (+3 more)
+Cohesion: 0.11
+Nodes (7): Entity, org.springframework.data.jpa.repository.JpaRepository, org.springframework.stereotype.Repository, Document, DocumentRepository, DocumentService, Table
 
 ### Community 6 - "What You Must Do When Invoked"
 Cohesion: 0.07
@@ -112,7 +129,7 @@ Nodes (26): For /graphify add and --watch, For /graphify query, For the commit h
 
 ### Community 7 - "org.junit.jupiter.api.Test"
 Cohesion: 0.07
-Nodes (16): javax.crypto.SecretKey, org.junit.jupiter.api.Test, org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc, org.springframework.security.oauth2.core.OAuth2TokenValidator, org.springframework.security.oauth2.jwt.Jwt, org.springframework.security.oauth2.jwt.JwtClaimsSet, org.springframework.security.oauth2.jwt.JwtEncoder, org.springframework.security.oauth2.jwt.NimbusJwtDecoder (+8 more)
+Nodes (16): org.junit.jupiter.api.Test, org.junit.jupiter.params.ParameterizedTest, org.junit.jupiter.params.provider.ValueSource, org.springframework.boot.test.context.SpringBootTest, org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc, org.springframework.test.web.servlet.MockMvc, ProcessedExcelFile, StoredFilename (+8 more)
 
 ### Community 8 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -122,9 +139,13 @@ Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only
 Cohesion: 0.38
 Nodes (8): mvnw script, clean(), die(), exec_maven(), hash_string(), set_java_home(), trim(), verbose()
 
+### Community 10 - "BBox"
+Cohesion: 0.12
+Nodes (3): BBox, CellOrigin, TableCellSplitter
+
 ### Community 11 - "ExcelColumn"
-Cohesion: 0.08
-Nodes (10): ExcelColumn, CellOrigin, MappedRecord, CarriedHeaderBand, LayoutRecordMapper, RegionMapping, RegionReading, RawFieldRecordBuilder (+2 more)
+Cohesion: 0.11
+Nodes (8): ExcelColumn, MappedRecord, CarriedHeaderBand, LayoutRecordMapper, RegionMapping, RegionReading, RawFieldRecordBuilder, RawFieldRecordBuilderTest
 
 ### Community 12 - "AiDocApplication"
 Cohesion: 0.48
@@ -150,69 +171,113 @@ Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify refer
 Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
-### Community 24 - "org.springframework.stereotype.Component"
-Cohesion: 0.38
-Nodes (7): org.springframework.stereotype.Component, ColumnClusterer, ColumnGutterDetector, LayoutAnalyzer, RegionClassifier, RowBander, VerticalSlabSplitter
+### Community 24 - "DocumentProcessingService.java"
+Cohesion: 0.28
+Nodes (8): org.springframework.stereotype.Component, ColumnClusterer, ColumnGutterDetector, LayoutAnalyzer, RegionClassifier, RowBander, VerticalSlabSplitter, ParsedDocumentFlattener
 
-### Community 25 - ".parse"
-Cohesion: 0.23
-Nodes (4): BatchConcurrencyTest, MockMultipartFile, DocumentProcessingMultiRowTest, MockMultipartFile
+### Community 25 - "org.springframework.mock.web.MockMultipartFile"
+Cohesion: 0.41
+Nodes (3): org.springframework.mock.web.MockMultipartFile, DocumentProcessingMultiRowTest, MockMultipartFile
 
 ### Community 26 - "ExcelTemplateInfo"
 Cohesion: 0.07
-Nodes (24): FunctionalInterface, org.apache.poi.ss.usermodel.Row, org.apache.poi.ss.usermodel.Sheet, org.apache.poi.ss.usermodel.Workbook, org.apache.poi.xssf.usermodel.XSSFWorkbook, org.junit.jupiter.api.condition.EnabledIfSystemProperty, DocumentProcessingException, InvalidExcelTemplateException (+16 more)
+Nodes (22): FunctionalInterface, org.apache.poi.ss.usermodel.Row, org.apache.poi.ss.usermodel.Sheet, org.apache.poi.ss.usermodel.Workbook, org.apache.poi.xssf.usermodel.XSSFWorkbook, InvalidExcelTemplateException, ExcelTemplateInfo, ExcelWriteMode (+14 more)
 
-### Community 27 - "DocumentProcessingBenchmarkTest"
-Cohesion: 0.22
-Nodes (5): org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable, org.springframework.test.context.DynamicPropertyRegistry, org.springframework.test.context.DynamicPropertySource, DocumentProcessingBenchmarkTest, MockMultipartFile
+### Community 27 - "DocumentProcessingBenchmarkTest.java"
+Cohesion: 0.21
+Nodes (6): org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable, org.junit.jupiter.api.condition.EnabledIfSystemProperty, org.springframework.test.context.DynamicPropertyRegistry, org.springframework.test.context.DynamicPropertySource, DocumentProcessingBenchmarkTest, MockMultipartFile
 
-### Community 47 - "LayoutRow"
+### Community 47 - "DocumentLayout"
 Cohesion: 0.13
-Nodes (9): java.util.regex.Pattern, ContinuationCandidate, LayoutCell, LayoutRow, RegionKind, KEY_VALUE, LIST, PROSE (+1 more)
+Nodes (11): java.util.regex.Pattern, ContinuationCandidate, DocumentLayout, LayoutCell, LayoutRow, RegionKind, KEY_VALUE, LIST (+3 more)
 
 ### Community 49 - "ExtractedDocumentData"
-Cohesion: 0.12
-Nodes (9): ExtractedDocumentData, HeaderAliases, HeaderFieldMapper, HeaderNameNormalizer, ExcelTemplateValidator, DocumentProcessingServiceTest, MockMultipartFile, DeterministicMappingTest (+1 more)
+Cohesion: 0.10
+Nodes (10): org.springframework.beans.factory.annotation.Autowired, ExtractedDocumentData, HeaderAliases, HeaderFieldMapper, HeaderNameNormalizer, ExcelTemplateValidator, DocumentProcessingServiceTest, MockMultipartFile (+2 more)
 
-### Community 52 - "DocumentFileValidator"
+### Community 51 - "NemotronDocumentUnderstandingService"
+Cohesion: 0.22
+Nodes (5): DocumentPageImage, Override, NemotronDocumentUnderstandingService, PageResult, tools.jackson.databind.JsonNode
+
+### Community 52 - "DocumentProcessingServiceTest.java"
 Cohesion: 0.11
-Nodes (6): EmptyFileException, FileSizeExceededException, InvalidFileTypeException, DocumentFileValidator, DocumentFileValidatorTest, TestFiles
-
-### Community 53 - "DocumentLayout"
-Cohesion: 0.23
-Nodes (3): DocumentLayout, LayoutHeaderInferrer, LayoutHeaderInferrerTest
+Nodes (8): EmptyFileException, FileSizeExceededException, InvalidFileTypeException, SemanticMappingService, DocumentUnderstandingService, DocumentFileValidator, DocumentFileValidatorTest, TestFiles
 
 ### Community 54 - "DocumentElement"
 Cohesion: 0.20
 Nodes (3): DocumentElement, ColumnAssignment, Geometry
 
-### Community 57 - "FreeAttemptAllowance"
-Cohesion: 0.09
-Nodes (18): jakarta.servlet.http.HttpServletRequest, org.springframework.security.authorization.AuthorizationManager, org.springframework.security.authorization.AuthorizationResult, org.springframework.security.core.Authentication, org.springframework.security.web.access.intercept.RequestAuthorizationContext, org.springframework.web.bind.annotation.GetMapping, org.springframework.web.bind.annotation.PostMapping, org.springframework.web.bind.annotation.RequestMapping (+10 more)
+### Community 55 - "SemanticMapping"
+Cohesion: 0.17
+Nodes (5): org.springframework.stereotype.Service, SemanticMapping, SemanticMappingResponse, NemotronSemanticMappingService, ModelJsonResponses
 
-### Community 59 - "DocumentProcessingServiceTest.java"
-Cohesion: 0.14
-Nodes (11): org.junit.jupiter.api.BeforeEach, org.springframework.boot.test.context.SpringBootTest, org.springframework.mock.web.MockMultipartFile, org.springframework.test.web.servlet.MockMvc, BatchItemResult, BatchProcessedExcelFile, ProcessedExcelFile, AiDocApplicationTests (+3 more)
+### Community 56 - "SecurityConfiguration.java"
+Cohesion: 0.20
+Nodes (11): HttpServletResponse, org.springframework.context.annotation.Bean, org.springframework.context.annotation.Configuration, org.springframework.http.HttpStatus, org.springframework.security.config.annotation.web.builders.HttpSecurity, org.springframework.security.oauth2.jwt.JwtDecoder, org.springframework.security.web.access.AccessDeniedHandler, org.springframework.security.web.AuthenticationEntryPoint (+3 more)
+
+### Community 57 - "FreeAttemptAllowance"
+Cohesion: 0.22
+Nodes (4): jakarta.servlet.http.HttpServletRequest, org.springframework.web.bind.annotation.GetMapping, ServiceStatus, FreeAttemptAllowance
+
+### Community 58 - "IndexedExtractedField"
+Cohesion: 0.39
+Nodes (3): IndexedExtractedField, Override, NemotronSemanticMappingServiceTest
+
+### Community 59 - "DocumentControllerTest.java"
+Cohesion: 0.33
+Nodes (4): org.junit.jupiter.api.BeforeEach, BatchItemResult, BatchProcessedExcelFile, DocumentControllerTest
+
+### Community 60 - "SessionTokenTest"
+Cohesion: 0.24
+Nodes (4): javax.crypto.SecretKey, org.springframework.security.oauth2.jwt.JwtClaimsSet, org.springframework.security.oauth2.jwt.JwtEncoder, SessionTokenTest
+
+### Community 61 - "SessionTokenIssuer"
+Cohesion: 0.21
+Nodes (9): org.springframework.web.bind.annotation.PostMapping, org.springframework.web.bind.annotation.RequestMapping, org.springframework.web.bind.annotation.RestController, AuthController, SessionRequest, SessionResponse, HealthController, IssuedSession (+1 more)
+
+### Community 63 - "GoogleTokenVerifier"
+Cohesion: 0.24
+Nodes (5): org.springframework.security.oauth2.core.OAuth2TokenValidator, org.springframework.security.oauth2.jwt.Jwt, org.springframework.security.oauth2.jwt.NimbusJwtDecoder, GoogleIdentity, GoogleTokenVerifier
+
+### Community 65 - "NemotronParseConcurrencyTest"
+Cohesion: 0.36
+Nodes (3): FakePageRenderer, Override, NemotronParseConcurrencyTest
+
+### Community 66 - "DocumentProcessingException"
+Cohesion: 0.29
+Nodes (5): java.awt.image.BufferedImage, org.apache.pdfbox.rendering.PDFRenderer, PDFRenderer, DocumentProcessingException, PdfDocumentRenderer
+
+### Community 67 - "SignedInOrWithinFreeAllowance"
+Cohesion: 0.42
+Nodes (6): org.springframework.security.authorization.AuthorizationManager, org.springframework.security.authorization.AuthorizationResult, org.springframework.security.core.Authentication, org.springframework.security.web.access.intercept.RequestAuthorizationContext, Override, SignedInOrWithinFreeAllowance
+
+### Community 68 - "CorsConfiguration"
+Cohesion: 0.38
+Nodes (4): org.springframework.web.servlet.config.annotation.CorsRegistry, org.springframework.web.servlet.config.annotation.WebMvcConfigurer, CorsConfiguration, Override
+
+### Community 72 - "NoTemplateMode"
+Cohesion: 0.67
+Nodes (3): NoTemplateMode, INFERRED_HEADERS, RAW_FIELDS
 
 ## Knowledge Gaps
 - **63 isolated node(s):** `com.example:ai-doc`, `FILL_THEN_APPEND`, `APPEND_ONLY`, `OVERWRITE`, `TABLE` (+58 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DocumentProcessingService` connect `DocumentProcessingService` to `NemotronDocumentUnderstandingService`, `org.springframework.http.ResponseEntity`, `ExtractedField`, `DocumentProcessingService.java`, `DocumentProcessingBenchmarkTest`, `ExcelColumn`, `ExtractedDocumentData`, `DocumentFileValidator`, `org.springframework.stereotype.Component`, `.parse`, `ExcelTemplateInfo`, `DocumentProcessingServiceTest.java`?**
+- **Why does `DocumentProcessingService` connect `DocumentProcessingService` to `NvidiaChatCompletionClient`, `BatchConcurrencyTest`, `DocumentProcessingException`, `ExtractedField`, `org.springframework.web.multipart.MultipartFile`, `ExplainedMapping`, `org.junit.jupiter.api.Test`, `NoTemplateMode`, `DocumentProcessingBenchmarkTest.java`, `ExcelColumn`, `DocumentLayout`, `ExtractedDocumentData`, `DocumentProcessingServiceTest.java`, `SemanticMapping`, `DocumentProcessingService.java`, `org.springframework.mock.web.MockMultipartFile`, `ExcelTemplateInfo`, `DocumentControllerTest.java`?**
   _High betweenness centrality (0.060) - this node is a cross-community bridge._
-- **Why does `DocumentElement` connect `DocumentElement` to `NemotronDocumentUnderstandingService`, `DocumentProcessingService`, `DocumentProcessingService.java`, `BBox`, `ExcelColumn`, `LayoutRow`, `.analyze`, `DocumentLayout`, `org.springframework.stereotype.Component`?**
+- **Why does `DocumentElement` connect `DocumentElement` to `NvidiaChatCompletionClient`, `DocumentProcessingService`, `BBox`, `DocumentLayout`, `.analyze`, `NemotronDocumentUnderstandingService`, `DocumentProcessingServiceTest.java`, `LayoutHeaderInferrer`, `DocumentProcessingService.java`, `.mapLayout`?**
   _High betweenness centrality (0.044) - this node is a cross-community bridge._
-- **Why does `DocumentProcessingException` connect `ExcelTemplateInfo` to `NemotronDocumentUnderstandingService`, `DocumentProcessingService`, `org.springframework.http.ResponseEntity`, `DocumentProcessingService.java`, `Document`, `ExtractedDocumentData`, `DocumentProcessingServiceTest.java`?**
+- **Why does `DocumentProcessingException` connect `DocumentProcessingException` to `NvidiaChatCompletionClient`, `DocumentProcessingService`, `org.springframework.http.ResponseEntity`, `ExtractedField`, `org.springframework.web.multipart.MultipartFile`, `Document`, `DocumentLayout`, `ExtractedDocumentData`, `NemotronDocumentUnderstandingService`, `DocumentProcessingServiceTest.java`, `SemanticMapping`, `DocumentProcessingService.java`, `ExcelTemplateInfo`?**
   _High betweenness centrality (0.038) - this node is a cross-community bridge._
 - **Are the 12 inferred relationships involving `BBox` (e.g. with `.stack()` and `.toDocumentElement()`) actually correct?**
   _`BBox` has 12 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `com.example:ai-doc`, `FILL_THEN_APPEND`, `APPEND_ONLY` to the rest of the system?**
   _63 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `NemotronDocumentUnderstandingService` be split into smaller, more focused modules?**
-  _Cohesion score 0.05334692490655794 - nodes in this community are weakly interconnected._
-- **Should `DocumentProcessingService` be split into smaller, more focused modules?**
-  _Cohesion score 0.13356562137049943 - nodes in this community are weakly interconnected._
+- **Should `Document` be split into smaller, more focused modules?**
+  _Cohesion score 0.10869565217391304 - nodes in this community are weakly interconnected._
+- **Should `What You Must Do When Invoked` be split into smaller, more focused modules?**
+  _Cohesion score 0.07407407407407407 - nodes in this community are weakly interconnected._
